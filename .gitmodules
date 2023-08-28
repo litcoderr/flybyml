@@ -1,0 +1,3 @@
+[submodule "XPlaneConnect"]
+	path = XPlaneConnect
+	url = https://github.com/nasa/XPlaneConnect.git
