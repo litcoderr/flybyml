@@ -1,26 +1,13 @@
-import time
-import xpc
+from action import getPos, setPos
+from pos import Gimpo
+from att import CessnaInit
 
-playtime = 60
+"""
+pos, att, gear = getPos()
+print(pos)
+print(att)
+"""
 
-with xpc.XPlaneConnect() as client:
-    client.sendCTRL([0,0,0,0,0,0.0])
-    Lat, Lon, Alt, Pitch, Roll, Yaw, Gear = client.getPOSI(0)
-    print(f"""
-    Lat: {Lat}
-    Lon: {Lon}
-    Alt: {Alt}
-    Pitch: {Pitch}
-    Yaw: {Yaw}
-    Gear: {Gear}
-    """)
-    client.sendPOSI([52.6, -1.1, 2500, 0,    0,   0,  1], 0)
-    Lat, Lon, Alt, Pitch, Roll, Yaw, Gear = client.getPOSI(0)
-    print(f"""
-    Lat: {Lat}
-    Lon: {Lon}
-    Alt: {Alt}
-    Pitch: {Pitch}
-    Yaw: {Yaw}
-    Gear: {Gear}
-    """)
+pos = Gimpo()
+att = CessnaInit(320)
+setPos(pos, att, 1)
