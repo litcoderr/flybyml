@@ -5,7 +5,7 @@ class Position:
         self.alt = alt
     
     def __str__(self):
-        return f"[Position] lat: {self.lat:.1f} | lon: {self.lon:.1f} | alt: {self.alt:.1f}"
+        return f"[Position] lat: {self.lat:.1f} | lon: {self.lon:.1f} | alt(m): {self.alt:.1f}"
 
 class Gimpo(Position):
     """

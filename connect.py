@@ -6,6 +6,8 @@ import struct
 import time
 import threading
 
+from pos import Position
+
 
 class XPlaneIpNotFound(Exception):
     args = "Could not find any running xplane instance in network."
@@ -126,7 +128,7 @@ class DataMap:
         self.map[idx].last_recieved = last_recieved
     
     def pop(self, idx):
-        self.map.pop(idx, None)
+        del self.map[idx]
 
 
 class XP(object):
@@ -153,9 +155,37 @@ class XP(object):
     def __del__(self):
         self.socket.close()
     
-    def get_latitude(self):
-        idx = self.get_dref(dref='sim/flightmodel/position/latitude')
-        return self.map.get(idx).data
+    # TODO implement get position call where each get_dref calls are async
+    def get_posi(self):
+        lat_idx = self.get_dref(dref='sim/flightmodel/position/latitude', isAsync=True)
+        lon_idx = self.get_dref(dref='sim/flightmodel/position/longitude', isAsync=True)
+        alt_idx = self.get_dref(dref='sim/flightmodel/position/elevation', isAsync=True)
+
+        # wait for all dref to be recieved
+        self.udp_join([lat_idx, lon_idx, alt_idx])
+
+        self.lock.acquire()
+        lat = self.map.get(lat_idx).data
+        lon = self.map.get(lon_idx).data
+        alt = self.map.get(alt_idx).data
+        self.lock.release()
+
+        return Position(lat, lon, alt)
+    
+    def udp_join(self, idxs):
+        while True:
+            complete = True
+
+            # check if all idxs are joined
+            self.lock.acquire()
+            for idx in idxs:
+                if self.map.get(idx).data == None:
+                    complete = False
+                    break
+            self.lock.release()
+
+            if complete:
+                break
 
     def get_dref(self, dref: str, isAsync = False) -> int:
         """
@@ -180,12 +210,7 @@ class XP(object):
 
         if not isAsync:
             # wait for self.map to be populated with retrieved data
-            while True:
-                self.lock.acquire()
-                if self.map.get(idx).data != None:
-                    self.lock.release()
-                    break
-                self.lock.release()
+            self.udp_join([idx])
         return idx
     
     def request_dref(self):
