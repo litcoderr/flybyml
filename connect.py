@@ -101,7 +101,7 @@ class Data:
 
 class DataMap:
     def __init__(self):
-        self.max_idx = 0
+        self.max_idx = 1
         self.map = {}
     
     def assign_idx(self) -> int:
@@ -130,7 +130,8 @@ class DataMap:
 
 
 class XP(object):
-    def __init__(self):
+    def __init__(self, verbose=False):
+        self.verbose = verbose
         self.beacon = find_xp()
         print("Beacon initialized...")
 
@@ -151,6 +152,10 @@ class XP(object):
     
     def __del__(self):
         self.socket.close()
+    
+    def get_num_engines(self):
+        idx = self.get_dref(dref='sim/aircraft/engine/acf_num_engines')
+        return self.map.get(idx).data
 
     def get_dref(self, dref: str, isAsync = False) -> int:
         """
@@ -167,12 +172,20 @@ class XP(object):
         unsub_msg = struct.pack("<4sxii400s", b'RREF', 0, idx, bytes(dref, 'utf-8'))
 
         self.map.allocate(idx, sub_msg, unsub_msg)  # subscribe to idx with unsub_msg to be called
-
+        
+        if self.verbose:
+            print(f"[{idx}] {dref} request subscribed")
+        
         self.lock.release()
 
         if not isAsync:
-            # TODO wait for self.map to be populated with retrieved data
-            pass
+            # wait for self.map to be populated with retrieved data
+            while True:
+                self.lock.acquire()
+                if self.map.get(idx).data != None:
+                    self.lock.release()
+                    break
+                self.lock.release()
         return idx
     
     def request_dref(self):
@@ -192,6 +205,9 @@ class XP(object):
                     # call request
                     cont.last_called = current_time
                     self.socket.sendto(cont.sub_msg, (self.beacon['ip'], self.beacon['port']))
+                    
+                    if self.verbose:
+                        print(f"[{idx}] request sent")
             
             self.lock.release()
     
@@ -208,6 +224,12 @@ class XP(object):
 
             self.lock.acquire()
 
+            if packet[0:4] != b'RREF':
+                if self.verbose:
+                    print("Unknown packet")
+                self.lock.release()
+                continue
+
             values = packet[5:]
             n_values = int(len(values) / 8)
 
@@ -215,9 +237,16 @@ class XP(object):
             for i in range(n_values):
                 packed = packet[(5 + 8*i): (5 + 8 * (i+1))]
                 (idx, data) = struct.unpack("<if", packed)
-                self.map.set(idx, data, current_time)
+                try:
+                    self.map.set(idx, data, current_time)
 
-                self.socket.sendto(self.map.get(idx).unsub_msg, (self.beacon['ip'], self.beacon['port']))
+                    self.socket.sendto(self.map.get(idx).unsub_msg, (self.beacon['ip'], self.beacon['port']))
+
+                    if self.verbose:
+                        print(f"[{idx}] request recieved and unsubscribed")
+                except:
+                    pass
+
             
             # collect garbage
             garbage = []
@@ -228,6 +257,9 @@ class XP(object):
             # delete garbage
             for garbage_idx in garbage:
                 self.map.pop(garbage_idx)
-            
+
+                if self.verbose:
+                    print(f"[{garbage_idx}] container destroyed")
+
             self.lock.release()
     

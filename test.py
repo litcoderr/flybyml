@@ -1,6 +1,9 @@
 from connect import XP
 
-xp = XP()
+xp = XP(verbose=True)
+
+num_engines = xp.get_num_engines()
+print(int(num_engines))
 
 while True:
     # TODO test getting dref
