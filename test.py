@@ -5,14 +5,16 @@ from att import CessnaInit
 import time
 from dref import hasCrashed, setIndicatedAirspeed, getIndicatedAirspeed, sendDref, getDref
 
-pos, att, gear = getPos()
-print(pos)
-print(att)
-pos.alt = 100
 
+pos, att, gear = getPos()
+pos.alt += 1000
 setPos(pos, att, 1)
 
+i = 0
 while True:
-    print(hasCrashed())
-    print(getIndicatedAirspeed())
-    time.sleep(1)
+
+    time.sleep(0.1)
+    pos, att, gear = getPos()
+    speed = getIndicatedAirspeed()
+    print(f'{i} {pos} {att} {speed}')
+    i+=1
