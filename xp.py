@@ -7,8 +7,9 @@ import time
 import threading
 import xpc
 
-from status.pos import Position
+from status.pos import Position, AirportPosition
 from status.att import Attitude
+from aircraft import Aircraft
 
 
 class XPlaneIpNotFound(Exception):
@@ -154,6 +155,31 @@ class XP(object):
             att = Attitude(pitch, roll, yaw)
         
         return pos, att, gear
+    
+    def set_posi(self, ac: Aircraft, airport: AirportPosition,
+                proposed_alt: float,
+                proposed_heading: float,
+                proposed_speed: float):
+        """
+        proposed_alt: m
+        proposed_heading: true heading
+        proposed_speed: m/s
+        """
+        type_start = 6  # used by maps and the like
+        msg = struct.pack('<4sxi150s2xiii8siiddddd', b'ACPR',
+                   0,                               # 0 -> User aircraft, otherwise 1-19
+                   ac.f_path.encode('utf-8'),       # remember to encode string as bytes
+                   0,                               # livery index for aircraft
+                   type_start,                      # See enumeration with PREL
+                   0,                               # 0 -> User aircraft, otherwise 1-19
+                   airport.id.encode('utf-8'),      # remember to encode string to bytes
+                   0,                               # it's an index, not the runway heading
+                   0,                               # again, an index
+                   airport.lat, airport.lon,        # Not needed, if you use apt_id
+                   airport.alt + proposed_alt,      # elevation meters
+                   proposed_heading,                # aircraft heading true
+                   proposed_speed)                  # speed meters per second
+        self.socket.sendto(msg, (self.beacon['ip'], self.beacon['port']))
     
     def get_indicated_airspeed(self):
         return self.get_dref('sim/flightmodel/position/indicated_airspeed')
