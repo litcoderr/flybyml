@@ -1,15 +1,9 @@
-from connect import XP
+from xp import XP
 import time
 
-pos, att, gear = getPos()
-pos.alt += 1000
-setPos(pos, att, 1)
+xp = XP()
 
-i = 0
 while True:
-
-    time.sleep(0.1)
-    pos, att, gear = getPos()
-    speed = getIndicatedAirspeed()
-    print(f'{i} {pos} {att} {speed}')
-    i+=1
+    time.sleep(0.06)
+    pos, att, gear = xp.get_posi()
+    airspeed = xp.get_indicated_airspeed()
