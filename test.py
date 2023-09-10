@@ -1,10 +1,5 @@
-from action import getPos, setPos
-from pos import Gimpo
-from att import CessnaInit
-
+from connect import XP
 import time
-from dref import hasCrashed, setIndicatedAirspeed, getIndicatedAirspeed, sendDref, getDref
-
 
 pos, att, gear = getPos()
 pos.alt += 1000
