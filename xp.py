@@ -157,9 +157,9 @@ class XP(object):
         return pos, att, gear
     
     def set_posi(self, ac: Aircraft, airport: AirportPosition,
-                proposed_alt: float,
-                proposed_heading: float,
-                proposed_speed: float):
+                alt: float,
+                heading: float,
+                speed: float):
         """
         proposed_alt: m
         proposed_heading: true heading
@@ -176,13 +176,21 @@ class XP(object):
                    0,                               # it's an index, not the runway heading
                    0,                               # again, an index
                    airport.lat, airport.lon,        # Not needed, if you use apt_id
-                   airport.alt + proposed_alt,      # elevation meters
-                   proposed_heading,                # aircraft heading true
-                   proposed_speed)                  # speed meters per second
+                   airport.alt + alt,      # elevation meters
+                   heading,                # aircraft heading true
+                   speed)                  # speed meters per second
         self.socket.sendto(msg, (self.beacon['ip'], self.beacon['port']))
     
     def get_indicated_airspeed(self):
-        return self.get_dref('sim/flightmodel/position/indicated_airspeed')
+        return self.get_dref('sim/flightmodel/position/indicated_airspeed')[0]
+    
+    def pause(self):
+        with xpc.XPlaneConnect() as client:
+            client.pauseSim(True)
+    
+    def resume(self):
+        with xpc.XPlaneConnect() as client:
+            client.pauseSim(False)
     
     def get_dref(self, dref):
         with xpc.XPlaneConnect() as client:
