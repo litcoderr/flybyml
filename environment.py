@@ -1,4 +1,6 @@
 import time
+import torch
+
 from xp import XP
 from util import ft_to_me, kts_to_mps
 from status.state import State
@@ -13,13 +15,13 @@ class XplaneEnvironment:
         self.xp = XP()  # xpilot controller
     
     def reset(self, heading, alt, spd):
-        self.xp.set_posi(self.aircraft, self.airport, ft_to_me(alt), heading, kts_to_mps(spd))
+        self.xp.set_posi(self.aircraft, self.airport, alt, heading, kts_to_mps(spd))
         state = self.getState()
         self.xp.pause()
 
         return state
     
-    def step(self, action):
+    def step(self, action: torch.Tensor):
         self.xp.resume()
         # 1. input action
         time.sleep(self.frame_interval)
