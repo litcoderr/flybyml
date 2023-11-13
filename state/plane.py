@@ -3,7 +3,7 @@ from .pos import Position
 from .att import Attitude
 
 
-class State:
+class PlaneState:
     """
     Generates state tensor
     """

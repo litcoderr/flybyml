@@ -1,10 +1,13 @@
-from objective import Objective
+from state.plane import PlaneState
+from aircraft import Aircraft
 
+class AgentInterface:
+    """
+    Agent Interface
+    """
+    def __init__(self, aircraft: Aircraft):
+        self.aircraft = aircraft
+        pass
 
-class Agent:
-    """
-    Deep Deterministic Policy Gradient Agent
-    """
-    def __init__(self, device: str):
-        self.device = device
-    # TODO implement DDPG
+    def sample_action(self, state: PlaneState):
+        pass

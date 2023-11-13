@@ -7,8 +7,8 @@ import time
 import threading
 import xpc
 
-from status.pos import Position, AirportPosition
-from status.att import Attitude
+from state.pos import Position, AirportPosition
+from state.att import Attitude
 from aircraft import Aircraft
 
 
@@ -95,46 +95,13 @@ def find_xp(wait=3.0):
     sock.close()
     return beacon_data
 
-class Data:
-    def __init__(self, idx, sub_msg, unsub_msg, data=None, last_called=0, last_recieved=None):
-        self.idx = idx
-        self.data = data
-        self.sub_msg = sub_msg
-        self.unsub_msg = unsub_msg
-        self.last_called = last_called
-        self.last_recieved = last_recieved
 
-class DataMap:
-    def __init__(self):
-        self.max_idx = 1
-        self.map = {}
-    
-    def assign_idx(self) -> int:
-        self.max_idx += 1
-        return self.max_idx-1
-    
-    def get_iterator(self):
-        return self.map.items()
-    
-    def allocate(self, idx, sub_msg, unsub_msg) -> int:
-        self.map[idx] = Data(idx, sub_msg, unsub_msg)
-        return idx
-    
-    def get(self, idx):
-        if idx in self.map.keys():
-            return self.map[idx]
-        else:
-            return None
-    
-    def set(self, idx, data, last_recieved):
-        self.map[idx].data = data
-        self.map[idx].last_recieved = last_recieved
-    
-    def pop(self, idx):
-        del self.map[idx]
+def get_dref(dref):
+    with xpc.XPlaneConnect() as client:
+        return client.getDREF(dref)
 
 
-class XP(object):
+class API(object):
     def __init__(self, verbose=False):
         self.verbose = verbose
         self.beacon = find_xp()
@@ -182,7 +149,7 @@ class XP(object):
         self.socket.sendto(msg, (self.beacon['ip'], self.beacon['port']))
     
     def get_indicated_airspeed(self):
-        return self.get_dref('sim/flightmodel/position/indicated_airspeed')[0]
+        return get_dref('sim/flightmodel/position/indicated_airspeed')[0]
     
     def pause(self):
         with xpc.XPlaneConnect() as client:
@@ -191,8 +158,3 @@ class XP(object):
     def resume(self):
         with xpc.XPlaneConnect() as client:
             client.pauseSim(False)
-    
-    def get_dref(self, dref):
-        with xpc.XPlaneConnect() as client:
-            return client.getDREF(dref)
-    
