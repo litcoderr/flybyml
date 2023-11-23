@@ -1,22 +1,26 @@
 import math
+from tkinter import Tk, Label, Entry, Button
+from threading import Thread
+
 from environment import XplaneEnvironment
 from agent import AgentInterface
 from state.plane import PlaneState
 from controls import Controls
 from aircraft.c172sp import C172SP
-from aircraft.b738 import B738
 from state.pos import Gimpo
 
 class Bug:
-    pitch = 5
-    roll = -10
-    spd = 60
+    def __init__(self, pitch, roll, spd):
+        self.pitch = pitch
+        self.roll = roll
+        self.spd = spd
 
 class HeuristicAgent(AgentInterface):
     def __init__(self):
         super().__init__(aircraft=C172SP())
 
-        self.control_buffer = Controls(
+        self.bug = Bug(0, 0, 60)
+        self.control_buffer = Controls( # maintains previous control input
             elev = 0,
             ail = 0,
             rud = 0,
@@ -27,74 +31,70 @@ class HeuristicAgent(AgentInterface):
         self.state_buffer = None
     
     def calc_elev(self, state: PlaneState):
-        MAX_PITCH_RATE = 1 # degree / sec
-        PITCH_DIFF_THRESH = 5 # degree
-        CONTROL_JERKNESS = 0.05
-        
-        def calc_target_pitchrate(pitch_diff):
-            if pitch_diff < -PITCH_DIFF_THRESH:
-                return MAX_PITCH_RATE
-            elif pitch_diff > PITCH_DIFF_THRESH:
-                return -MAX_PITCH_RATE
-            else:
-                return (-MAX_PITCH_RATE / PITCH_DIFF_THRESH) * pitch_diff
-        
-        def calc_elev_delta(pitch_rate_diff):
-            if pitch_rate_diff < 0:
-                return CONTROL_JERKNESS * math.pow(pitch_rate_diff, 2)
-            else:
-                return -1 * CONTROL_JERKNESS * math.pow(pitch_rate_diff, 2)
-        
-        pitch_diff = state.att.pitch - Bug.pitch
-        pitch_rate = state.att.pitch - self.state_buffer.att.pitch
-        target_pitchrate = calc_target_pitchrate(pitch_diff)
-        pitch_rate_diff = pitch_rate - target_pitchrate
-        elev_delta = calc_elev_delta(pitch_rate_diff)
+        # hyper parameters
+        K_p = 0.01
+        K_d = 0.1
 
-        target_position = self.control_buffer.elev + elev_delta
-        # print(f"pitch: {state.att.pitch:.2f} elevator: {target_position:.2f}")
-        # clip elevator position
-        if target_position >= 1:
-            return 1
-        elif target_position <= -1:
-            return -1
-        else:
-            return target_position
+        # calculate proportional value
+        error = self.bug.pitch - state.att.pitch
+        proportional = K_p * error
+
+        # calculate derivative value
+        previous_error = self.bug.pitch - self.state_buffer.att.pitch
+        derivative = K_d * (error - previous_error)
+
+        rate = proportional + derivative
+
+        elev = self.control_buffer.elev + rate 
+        if elev > 1:
+            elev = 1
+        elif elev < -1:
+            elev = -1
+        return elev
 
     def calc_ail(self, state: PlaneState):
-        MAX_ROLL_RATE = 1 # degree / sec
-        ROLL_DIFF_THRESH = 5 # degree
-        CONTROL_JERKNESS = 0.05
-        
-        def calc_target_rollrate(roll_diff):
-            if roll_diff < -ROLL_DIFF_THRESH:
-                return MAX_ROLL_RATE
-            elif roll_diff > ROLL_DIFF_THRESH:
-                return -MAX_ROLL_RATE
-            else:
-                return (-MAX_ROLL_RATE / ROLL_DIFF_THRESH) * roll_diff
-        
-        def calc_ail_delta(roll_rate_diff):
-            if roll_rate_diff < 0:
-                return CONTROL_JERKNESS * math.pow(roll_rate_diff, 2)
-            else:
-                return -1 * CONTROL_JERKNESS * math.pow(roll_rate_diff, 2)
-        
-        roll_diff = state.att.roll - Bug.roll
-        roll_rate = state.att.roll - self.state_buffer.att.roll
-        target_rollrate = calc_target_rollrate(roll_diff)
-        roll_rate_diff = roll_rate - target_rollrate
-        roll_delta = calc_ail_delta(roll_rate_diff)
+        # hyper parameters
+        K_p = 0.01
+        K_d = 0.1
 
-        target_position = self.control_buffer.ail + roll_delta
-        #print(f"roll: {state.att.roll:.2f} aileron: {target_position:.2f}")
-        # clip elevator position
-        if target_position >= 1:
-            return 1
-        elif target_position <= -1:
-            return -1
-        else:
-            return target_position
+        # calculate proportional value
+        error = self.bug.roll - state.att.roll
+        proportional = K_p * error
+
+        # calculate derivative value
+        previous_error = self.bug.roll - self.state_buffer.att.roll
+        derivative = K_d * (error - previous_error)
+
+        rate = proportional + derivative
+
+        ail = self.control_buffer.ail + rate 
+        if ail > 1:
+            ail = 1
+        elif ail < -1:
+            ail = -1
+        return ail
+    
+    def calc_thr(self, state: PlaneState):
+        # hyper parameters
+        K_p = 0.005
+        K_d = 0.15
+
+        # calculate proportional value
+        error = self.bug.spd - state.spd
+        proportional = K_p * error
+
+        # calculate derivative value
+        previous_error = self.bug.spd - self.state_buffer.spd
+        derivative = K_d * (error - previous_error)
+
+        rate = proportional + derivative
+
+        thr = self.control_buffer.thr + rate 
+        if thr > 1:
+            thr = 1
+        elif thr < 0:
+            thr = 0
+        return thr
     
     def sample_action(self, state: PlaneState) -> Controls:
         if self.state_buffer is None:
@@ -104,7 +104,7 @@ class HeuristicAgent(AgentInterface):
                 elev = self.calc_elev(state),
                 ail = self.calc_ail(state),
                 rud = 0,
-                thr = 0.8,
+                thr = self.calc_thr(state),
                 gear = 1,
                 flaps = 0
             )
@@ -112,14 +112,56 @@ class HeuristicAgent(AgentInterface):
             self.control_buffer = controls
         return self.control_buffer
 
-airport = Gimpo()
-agent = HeuristicAgent()
-env = XplaneEnvironment(agent, airport, frame_interval=0.1)
+class GUI(Tk):
+    def __init__(self, agent: HeuristicAgent):
+        super().__init__()
+        self.agent = agent
 
-state = env.reset(heading=320, alt=1000, spd=30)
-count = 0
-while True:
-    if count > 100:
-        Bug.spd = 90
-    count += 1
-    state = env.step(state)
+        self.pitch_label = Label(self, text='pitch')
+        self.pitch_label.grid(row=0, column=0)
+        self.pitch_entry = Entry(self)
+        self.pitch_entry.grid(row=0, column=1)
+        self.pitch_set_btn = Button(self, text="set", command=self.set_pitch)
+        self.pitch_set_btn.grid(row=0, column=2)
+        
+        self.roll_label = Label(self, text='roll')
+        self.roll_label.grid(row=1, column=0)
+        self.roll_entry = Entry(self)
+        self.roll_entry.grid(row=1, column=1)
+        self.roll_set_btn = Button(self, text="set", command=self.set_roll)
+        self.roll_set_btn.grid(row=1, column=2)
+
+        self.spd_label = Label(self, text='spd')
+        self.spd_label.grid(row=2, column=0)
+        self.spd_entry = Entry(self)
+        self.spd_entry.grid(row=2, column=1)
+        self.spd_set_btn = Button(self, text="set", command=self.set_spd)
+        self.spd_set_btn.grid(row=2, column=2)
+    
+    def set_pitch(self):
+        pitch = float(self.pitch_entry.get())
+        self.agent.bug.pitch = pitch
+
+    def set_roll(self):
+        roll = float(self.roll_entry.get())
+        self.agent.bug.roll = roll
+
+    def set_spd(self):
+        spd = float(self.spd_entry.get())
+        self.agent.bug.spd = spd
+
+if __name__ == "__main__":
+    airport = Gimpo()
+    agent = HeuristicAgent()
+    env = XplaneEnvironment(agent, airport, frame_interval=0.1)
+
+    def simulation():
+        state = env.reset(heading=320, alt=1000, spd=30)
+        while True:
+            state = env.step(state)
+
+    simulation_thread = Thread(target=simulation, daemon=True)
+    simulation_thread.start()
+
+    gui = GUI(agent)
+    gui.mainloop()
