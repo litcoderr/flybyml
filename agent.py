@@ -1,5 +1,6 @@
 from state.plane import PlaneState
 from aircraft import Aircraft
+from controls import Controls
 
 class AgentInterface:
     """
@@ -7,7 +8,6 @@ class AgentInterface:
     """
     def __init__(self, aircraft: Aircraft):
         self.aircraft = aircraft
-        pass
 
-    def sample_action(self, state: PlaneState):
-        pass
+    def sample_action(self, state: PlaneState) -> Controls:
+        raise NotImplementedError()

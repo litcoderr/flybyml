@@ -7,6 +7,7 @@ import time
 import threading
 import xpc
 
+from controls import Controls
 from state.pos import Position, AirportPosition
 from state.att import Attitude
 from aircraft import Aircraft
@@ -148,8 +149,19 @@ class API(object):
                    speed)                  # speed meters per second
         self.socket.sendto(msg, (self.beacon['ip'], self.beacon['port']))
     
+    def sendCTRL(self, controls: Controls):
+        with xpc.XPlaneConnect() as client:
+            client.sendCTRL(controls.to_list())
+    
     def get_indicated_airspeed(self):
+        # m / s
         return get_dref('sim/flightmodel/position/indicated_airspeed')[0]
+    
+    def get_vertical_speed(self):
+        # m / s
+        fpm = get_dref('sim/cockpit2/tcas/targets/position/vertical_speed')[0]
+        mps = fpm * (0.3048 / 60)
+        return mps
     
     def pause(self):
         with xpc.XPlaneConnect() as client:

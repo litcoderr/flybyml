@@ -15,7 +15,7 @@ class XplaneEnvironment:
 
         self.api = API()  # xpilot controller
     
-    def reset(self, heading, alt, spd):
+    def reset(self, heading, alt, spd) -> PlaneState:
         """
         heading: degree
         alt: m
@@ -27,9 +27,10 @@ class XplaneEnvironment:
 
         return state
     
-    def step(self, action: torch.Tensor):
+    def step(self, prev_state: PlaneState) -> PlaneState:
+        action = self.agent.sample_action(prev_state)
         self.api.resume()
-        # TODO 1. input action
+        self.api.sendCTRL(action)
         time.sleep(self.frame_interval)
         self.api.pause()
         return self.getState()
@@ -39,7 +40,8 @@ class XplaneEnvironment:
             try:
                 pos, att, gear = self.api.get_posi()
                 spd = self.api.get_indicated_airspeed()
-                state = PlaneState(pos, att, spd, gear)
+                vert_spd = self.api.get_vertical_speed()
+                state = PlaneState(pos, att, spd, vert_spd, gear)
                 break
             except:
                 time.sleep(0.1)
