@@ -11,6 +11,18 @@ def mps_to_kts(mps):
     """
     return mps * 1.94384
 
+def mps_to_fpm(mps):
+    """
+    meters per second to feet per minute
+    """
+    return mps * 196.85
+
+def fpm_to_mps(fpm):
+    """
+    feet per minute to meters per second
+    """
+    return fpm / 196.85
+
 def me_to_ft(me):
     """
     meters to feets
