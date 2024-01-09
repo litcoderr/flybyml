@@ -25,7 +25,7 @@ class Mode:
 
     # lateral mode
     ROLL = 'ROLL' # maintain roll
-    HDG = 'HDG' # TODO maintain heading
+    HDG = 'HDG' # maintain heading
 
     # vertical mode
     PITCH = 'PITCH' # maintain pitch
@@ -154,7 +154,6 @@ class HeuristicAgent(AgentInterface):
             self.bug.roll = roll
     
     def calc_target_pitch(self, state: PlaneState):
-        # TODO calculate altitude change rate and change to altacq mode respectively
         altacq_threshold = ft_to_me(100)
         if self.mode.vertical == Mode.VS:
             converging_dir = ((self.bug.alt - state.pos.alt) * state.vert_spd) >= 0
@@ -167,7 +166,6 @@ class HeuristicAgent(AgentInterface):
                 self.bug.vs = 0
                 self.mode.vertical = Mode.ALT
             else:
-                # TODO implement with controlling vertical speed
                 vs_threshold = 2000
                 # hyper parameters
                 K_p = 0.0015
@@ -180,7 +178,6 @@ class HeuristicAgent(AgentInterface):
                 # calculate derivative value
                 previous_error = self.bug.alt - self.state_buffer.pos.alt
                 derivative = K_d * (error - previous_error)
-                print(f"p: {proportional:.2f} d: {derivative:.2f}")
 
                 rate = proportional + derivative
 
