@@ -3,7 +3,7 @@ import torch
 
 from agent import AgentInterface
 from api import API
-from state.plane import PlaneState
+from state.state import PlaneState
 from state.pos import AirportPosition
 
 
@@ -21,16 +21,18 @@ class XplaneEnvironment:
         alt: m
         spd: m/s
         """
-        self.api.set_posi(self.agent.aircraft, self.airport, alt, heading, spd)
+        # TODO should change to set position by absolute position
+        self.api.set_posi_by_airport(self.agent.aircraft, self.airport, alt, heading, spd)
         state = self.getState()
         self.api.pause()
 
         return state
     
     def step(self, prev_state: PlaneState) -> PlaneState:
-        action = self.agent.sample_action(prev_state)
+        controls = self.agent.sample_action(prev_state)
+
         self.api.resume()
-        self.api.sendCTRL(action)
+        self.api.send_ctrl(controls)
         time.sleep(self.frame_interval)
         self.api.pause()
         return self.getState()

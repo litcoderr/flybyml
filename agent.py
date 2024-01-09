@@ -1,4 +1,4 @@
-from state.plane import PlaneState
+from state.state import PlaneState
 from aircraft import Aircraft
 from controls import Controls
 

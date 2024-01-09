@@ -4,7 +4,7 @@ from threading import Thread
 
 from environment import XplaneEnvironment
 from agent import AgentInterface
-from state.plane import PlaneState
+from state.state import PlaneState
 from controls import Controls
 from aircraft.c172sp import C172SP
 from state.pos import Gimpo
@@ -50,7 +50,8 @@ class HeuristicAgent(AgentInterface):
             rud = 0,
             thr = 0.8,
             gear = 1,
-            flaps = 0
+            flaps = 0,
+            trim = 0
         )
         self.state_buffer = PlaneState()
     
@@ -227,7 +228,8 @@ class HeuristicAgent(AgentInterface):
                 rud = 0,
                 thr = self.calc_thr(state),
                 gear = 1,
-                flaps = 0
+                flaps = 0,
+                trim = 0
             )
             self.state_buffer = state
             self.control_buffer = controls

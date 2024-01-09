@@ -101,6 +101,10 @@ def get_dref(dref):
     with xpc.XPlaneConnect() as client:
         return client.getDREF(dref)
 
+def set_dref(dref, value):
+    with xpc.XPlaneConnect() as client:
+        client.sendDREF(dref, value)
+
 
 class API(object):
     def __init__(self, verbose=False):
@@ -124,7 +128,7 @@ class API(object):
         
         return pos, att, gear
     
-    def set_posi(self, ac: Aircraft, airport: AirportPosition,
+    def set_posi_by_airport(self, ac: Aircraft, airport: AirportPosition,
                 alt: float,
                 heading: float,
                 speed: float):
@@ -149,9 +153,23 @@ class API(object):
                    speed)                  # speed meters per second
         self.socket.sendto(msg, (self.beacon['ip'], self.beacon['port']))
     
-    def sendCTRL(self, controls: Controls):
+    def send_ctrl(self, controls: Controls):
         with xpc.XPlaneConnect() as client:
-            client.sendCTRL(controls.to_list())
+            # set controls except for elevator trim
+            client.sendCTRL(controls.to_api_compatible())
+            self.set_elev_trim(controls.trim)
+    
+    def get_ctrl(self) -> Controls:
+        with xpc.XPlaneConnect() as client:
+            elev, ail, rud, thr, gear, flaps, _ = client.getCTRL(0)
+            trim = self.get_elev_trim()
+            return Controls(elev, ail, rud, thr, gear, flaps, trim)
+    
+    def get_elev_trim(self) -> float:
+        return get_dref("sim/cockpit2/controls/elevator_trim")[0]
+
+    def set_elev_trim(self, value):
+        set_dref("sim/cockpit2/controls/elevator_trim", value)
     
     def get_indicated_airspeed(self):
         # m / s
