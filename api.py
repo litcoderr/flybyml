@@ -121,13 +121,13 @@ class API(object):
     def get_posi(self):
         # Implemented using xplane connect for faster response
         with xpc.XPlaneConnect() as client:
-            lat, lon, alt, pitch, roll, yaw, gear = client.getPOSI(0)
+            lat, lon, alt, pitch, roll, yaw, _ = client.getPOSI(0)
 
             pos = Position(lat, lon, alt)
             att = Attitude(pitch, roll, yaw)
         
-        return pos, att, gear
-    
+        return pos, att
+
     def set_posi_by_airport(self, ac: Aircraft, airport: AirportPosition,
                 alt: float,
                 heading: float,

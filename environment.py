@@ -40,10 +40,10 @@ class XplaneEnvironment:
     def getState(self) -> PlaneState:
         while True:
             try:
-                pos, att, gear = self.api.get_posi()
+                pos, att = self.api.get_posi()
                 spd = self.api.get_indicated_airspeed()
                 vert_spd = self.api.get_vertical_speed()
-                state = PlaneState(pos, att, spd, vert_spd, gear)
+                state = PlaneState(pos, att, spd, vert_spd)
                 break
             except:
                 time.sleep(0.1)
