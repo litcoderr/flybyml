@@ -1,15 +1,12 @@
-from typing import Optional
 import binascii
 import platform
 import socket
 import struct
-import time
-import threading
 import xpc
 
 from controls import Controls
-from state.pos import Position, AirportPosition
 from state.att import Attitude
+from state.pos import Position
 from aircraft import Aircraft
 
 
@@ -118,7 +115,7 @@ class API(object):
     def __del__(self):
         self.socket.close()
     
-    def get_posi(self):
+    def get_posi_att(self):
         # Implemented using xplane connect for faster response
         with xpc.XPlaneConnect() as client:
             lat, lon, alt, pitch, roll, yaw, _ = client.getPOSI(0)
@@ -128,11 +125,15 @@ class API(object):
         
         return pos, att
 
-    def set_posi_by_airport(self, ac: Aircraft, airport: AirportPosition,
+    def set_init_state(self, ac: Aircraft,
+                lat: float,
+                lon: float,
                 alt: float,
                 heading: float,
                 speed: float):
         """
+        lat: degree
+        lon: degree
         proposed_alt: m
         proposed_heading: true heading
         proposed_speed: m/s
@@ -144,11 +145,11 @@ class API(object):
                    0,                               # livery index for aircraft
                    type_start,                      # See enumeration with PREL
                    0,                               # 0 -> User aircraft, otherwise 1-19
-                   airport.id.encode('utf-8'),      # remember to encode string to bytes
+                   ''.encode('utf-8'),      # remember to encode string to bytes
                    0,                               # it's an index, not the runway heading
                    0,                               # again, an index
-                   airport.lat, airport.lon,        # Not needed, if you use apt_id
-                   airport.alt + alt,      # elevation meters
+                   lat, lon,        # Not needed, if you use apt_id
+                   alt,      # elevation meters
                    heading,                # aircraft heading true
                    speed)                  # speed meters per second
         self.socket.sendto(msg, (self.beacon['ip'], self.beacon['port']))

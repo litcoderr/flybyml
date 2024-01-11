@@ -1,4 +1,5 @@
-import math
+# TODO out of date. needs to be reviewed
+
 from tkinter import Tk, Label, Entry, Button, Frame
 from threading import Thread
 
@@ -7,7 +8,6 @@ from agent import AgentInterface
 from state.state import PlaneState
 from controls import Controls
 from aircraft.c172sp import C172SP
-from state.pos import Gimpo
 from util import ft_to_me, me_to_ft, mps_to_fpm, fpm_to_mps
 
 class Bug:
@@ -343,7 +343,6 @@ class ModeSelector(Frame):
         self.vs_label['text'] = f'v/s: {int(mps_to_fpm(self.agent.state_buffer.vert_spd))}'
         self.after(50, self.update)
 
-
 class GUI(Tk):
     def __init__(self, agent: HeuristicAgent):
         super().__init__()
@@ -353,15 +352,13 @@ class GUI(Tk):
         self.mode_selector = ModeSelector(self, agent)
         self.mode_selector.pack()
 
-    
 
 if __name__ == "__main__":
-    airport = Gimpo()
     agent = HeuristicAgent()
-    env = XplaneEnvironment(agent, airport, frame_interval=0.1)
+    env = XplaneEnvironment(agent, frame_interval=0.1)
 
     def simulation():
-        state = env.reset(heading=320, alt=1000, spd=30)
+        state = env.reset(lat=32, lon=32, alt=1000, heading=320, spd=30)
         while True:
             state = env.step(state)
 

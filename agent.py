@@ -9,5 +9,5 @@ class AgentInterface:
     def __init__(self, aircraft: Aircraft):
         self.aircraft = aircraft
 
-    def sample_action(self, state: PlaneState) -> Controls:
+    def sample_action(self, state: PlaneState, **kwargs) -> Controls:
         raise NotImplementedError()
