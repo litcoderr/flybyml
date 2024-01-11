@@ -1,5 +1,7 @@
 from typing import Optional
 
+import random
+
 from aircraft import Aircraft
 from aircraft.b738 import B738
 from state.pos import Position
@@ -15,6 +17,7 @@ class Config:
     init_pos: Position = Position(lat=37.5326, lon=127.024612, alt=1000) 
     init_heading: float = 0 # degrees
     init_speed: float = 128 # m/s
+    init_zulu_time: float = 0 # GMT time. seconds since midnight
 
 class HumanAgent(AgentInterface):
     def __init__(self, aircraft: Aircraft):
@@ -30,6 +33,12 @@ class HumanAgent(AgentInterface):
         controls = self.api.get_ctrl()
         return controls
 
+def sample_zulu_time() -> float:
+    """
+    returns GMT time. seconds since midnight
+    """
+    seconds_per_day = 86400
+    return seconds_per_day * random.random()
 
 if __name__ == "__main__":
     # set up human agent and environment
@@ -38,13 +47,16 @@ if __name__ == "__main__":
     human.set_api(env.api)
 
     # TODO randomize configuration for every run
+    Config.init_zulu_time = sample_zulu_time()
+    print(Config.init_zulu_time / 3600)
 
     state = env.reset(
         lat = Config.init_pos.lat,
         lon = Config.init_pos.lon,
         alt = Config.init_pos.alt,
         heading = Config.init_heading,
-        spd = Config.init_speed
+        spd = Config.init_speed,
+        zulu_time=Config.init_zulu_time
     )
 
     while True:

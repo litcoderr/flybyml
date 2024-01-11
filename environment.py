@@ -14,15 +14,24 @@ class XplaneEnvironment:
 
         self.api = API()  # xpilot controller
     
-    def reset(self, lat, lon, alt, heading, spd) -> PlaneState:
+    def reset(self, lat, lon, alt, heading, spd, zulu_time) -> PlaneState:
         """
         lat: degree
         lon: degree
         heading: degree
         alt: m
         spd: m/s
+        zulu_time: GMT time. seconds since midnight
         """
         self.api.set_init_state(self.agent.aircraft, lat, lon, alt, heading, spd)
+        # set time / weather
+        while True:
+            try:
+                self.api.set_zulu_time(zulu_time)
+                # TODO set weather
+                break
+            except:
+                time.sleep(0.1)
         state = self.getState()
 
         return state

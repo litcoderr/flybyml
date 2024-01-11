@@ -182,6 +182,10 @@ class API(object):
         mps = fpm * (0.3048 / 60)
         return mps
     
+    def set_zulu_time(self, zulu_time: float):
+        # zulu_time: GMT time. seconds since midnight
+        set_dref('sim/time/zulu_time_sec', zulu_time)
+    
     def pause(self):
         with xpc.XPlaneConnect() as client:
             client.pauseSim(True)
