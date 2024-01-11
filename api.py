@@ -8,6 +8,7 @@ from controls import Controls
 from state.att import Attitude
 from state.pos import Position
 from aircraft import Aircraft
+from weather import Weather
 
 
 class XPlaneIpNotFound(Exception):
@@ -185,6 +186,10 @@ class API(object):
     def set_zulu_time(self, zulu_time: float):
         # zulu_time: GMT time. seconds since midnight
         set_dref('sim/time/zulu_time_sec', zulu_time)
+    
+    def set_weather(self, weather: Weather):
+        # TODO set dref of all Weather properties
+        pass
     
     def pause(self):
         with xpc.XPlaneConnect() as client:

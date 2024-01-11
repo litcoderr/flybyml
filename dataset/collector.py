@@ -10,6 +10,7 @@ from controls import Controls
 from agent import AgentInterface
 from api import API
 from environment import XplaneEnvironment
+from weather import Weather, ChangeMode
 
 
 class Config:
@@ -18,6 +19,7 @@ class Config:
     init_heading: float = 0 # degrees
     init_speed: float = 128 # m/s
     init_zulu_time: float = 0 # GMT time. seconds since midnight
+    weather: Optional[Weather] = None
 
 class HumanAgent(AgentInterface):
     def __init__(self, aircraft: Aircraft):
@@ -40,6 +42,15 @@ def sample_zulu_time() -> float:
     seconds_per_day = 86400
     return seconds_per_day * random.random()
 
+def sample_weather() -> Weather:
+    """
+    returns sampled Weather object
+    """
+    # TODO sample weather properties
+    return Weather(
+        change_mode = ChangeMode(0)
+    )
+
 if __name__ == "__main__":
     # set up human agent and environment
     human = HumanAgent(Config.aircraft)
@@ -48,7 +59,7 @@ if __name__ == "__main__":
 
     # TODO randomize configuration for every run
     Config.init_zulu_time = sample_zulu_time()
-    print(Config.init_zulu_time / 3600)
+    Config.weather = sample_weather()
 
     state = env.reset(
         lat = Config.init_pos.lat,
@@ -56,7 +67,8 @@ if __name__ == "__main__":
         alt = Config.init_pos.alt,
         heading = Config.init_heading,
         spd = Config.init_speed,
-        zulu_time=Config.init_zulu_time
+        zulu_time = Config.init_zulu_time,
+        weather = Config.weather
     )
 
     while True:

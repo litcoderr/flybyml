@@ -6,6 +6,7 @@ from agent import AgentInterface
 from api import API
 from state.state import PlaneState
 from controls import Controls
+from weather import Weather
 
 
 class XplaneEnvironment:
@@ -14,7 +15,7 @@ class XplaneEnvironment:
 
         self.api = API()  # xpilot controller
     
-    def reset(self, lat, lon, alt, heading, spd, zulu_time) -> PlaneState:
+    def reset(self, lat, lon, alt, heading, spd, zulu_time, weather: Weather) -> PlaneState:
         """
         lat: degree
         lon: degree
@@ -22,13 +23,14 @@ class XplaneEnvironment:
         alt: m
         spd: m/s
         zulu_time: GMT time. seconds since midnight
+        weather: Weather object
         """
         self.api.set_init_state(self.agent.aircraft, lat, lon, alt, heading, spd)
         # set time / weather
         while True:
             try:
                 self.api.set_zulu_time(zulu_time)
-                # TODO set weather
+                self.api.set_weather(weather)
                 break
             except:
                 time.sleep(0.1)
