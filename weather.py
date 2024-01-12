@@ -50,8 +50,33 @@ class CloudCoverage(WeatherProperty):
     def __init__(self, value: List[float]):
         """
         Coverage of 3 cloud layers (0-1 range)
+        How dense the clouds are
         """
         super().__init__(dref="sim/weather/region/cloud_coverage_percent",
+                         value=value)
+
+class CloudType(WeatherProperty):
+    def __init__(self, value: List[float]):
+        """
+        Type of 3 cloud layers.
+        Intermediate float values can be accepted
+        0 = Cirrus
+        1 = Stratus
+        2 = Cumulus
+        3 = Cumulo-nimbus
+        """
+        super().__init__(dref="sim/weather/region/cloud_type",
+                         value=value)
+
+"""
+Precipitation and Temperature
+"""
+class Precipitation(WeatherProperty):
+    def __init__(self, value: float):
+        """
+        Degree of rain/snow falling (0-1 range)
+        """
+        super().__init__(dref="sim/weather/region/rain_percent",
                          value=value)
 
 
@@ -60,13 +85,13 @@ class Weather:
                  change_mode: ChangeMode,
                  cloud_base_msl: CloudBaseMsl,
                  cloud_top_msl: CloudTopMsl,
-                 cloud_coverage: CloudCoverage):
+                 cloud_coverage: CloudCoverage,
+                 cloud_type: CloudType,
+                 precipitation: Precipitation):
         self.change_mode = change_mode
         # clouds
         self.cloud_base_msl = cloud_base_msl
         self.cloud_top_msl = cloud_top_msl
         self.cloud_coverage = cloud_coverage
-    
-    def __iter__(self):
-        for attr, value in self.__dict__.iteritems():
-            yield attr, value
+        self.cloud_type = cloud_type
+        self.precipitation = precipitation
