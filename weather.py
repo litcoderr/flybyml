@@ -93,6 +93,14 @@ class RunwayWetness(WeatherProperty):
         super().__init__(dref="sim/weather/region/runway_friction",
                          value=value)
 
+class Temperature(WeatherProperty):
+    def __init__(self, value: float):
+        """
+        Temperature at MSL(Mean Sea Level) (degree Celsius)
+        """
+        super().__init__(dref="sim/weather/region/sealevel_temperature_c",
+                         value=value)
+
 
 class Weather:
     def __init__(self,
@@ -102,7 +110,8 @@ class Weather:
                  cloud_coverage: CloudCoverage,
                  cloud_type: CloudType,
                  precipitation: Precipitation,
-                 runway_wetness: RunwayWetness):
+                 runway_wetness: RunwayWetness,
+                 temperature: Temperature):
         self.change_mode = change_mode
         # clouds
         self.cloud_base_msl = cloud_base_msl
@@ -111,3 +120,4 @@ class Weather:
         self.cloud_type = cloud_type
         self.precipitation = precipitation
         self.runway_wetness = runway_wetness
+        self.temperature = temperature
