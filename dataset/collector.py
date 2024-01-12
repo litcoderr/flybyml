@@ -10,7 +10,9 @@ from controls import Controls
 from agent import AgentInterface
 from api import API
 from environment import XplaneEnvironment
-from weather import Weather, ChangeMode, CloudBaseMsl, CloudTopMsl, CloudCoverage, CloudType, Precipitation
+from weather import Weather, ChangeMode, \
+    CloudBaseMsl, CloudTopMsl, CloudCoverage, CloudType, \
+    Precipitation, RunwayWetness
 
 
 class Config:
@@ -53,7 +55,8 @@ def sample_weather() -> Weather:
         cloud_top_msl = CloudTopMsl([3000*0.3, 0, 0]),
         cloud_coverage = CloudCoverage([1, 0, 0]),
         cloud_type = CloudType([2, 0, 0]),
-        precipitation = Precipitation(1)
+        precipitation = Precipitation(1),
+        runway_wetness = RunwayWetness(5)
     )
     # TODO sample weather properties by implementing sample method to weather
     return weather
