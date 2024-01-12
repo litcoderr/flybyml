@@ -188,8 +188,9 @@ class API(object):
         set_dref('sim/time/zulu_time_sec', zulu_time)
     
     def set_weather(self, weather: Weather):
-        # TODO set dref of all Weather properties
-        pass
+        # set dref of all Weather properties
+        for prop in weather.__dict__.values():
+            set_dref(prop.dref, prop.value)
     
     def pause(self):
         with xpc.XPlaneConnect() as client:
