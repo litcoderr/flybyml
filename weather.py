@@ -38,10 +38,18 @@ class CloudBaseMsl(WeatherProperty):
         super().__init__(dref="sim/weather/region/cloud_base_msl_m",
                          value=value)
 
+class CloudTopMsl(WeatherProperty):
+    def __init__(self, value: List[float]):
+        """
+        Top altitude (MSL in meters) of 3 cloud layers
+        """
+        super().__init__(dref="sim/weather/region/cloud_tops_msl_m",
+                         value=value)
+
 class CloudCoverage(WeatherProperty):
     def __init__(self, value: List[float]):
         """
-        Coverage of 3 cloud layers (percentage)
+        Coverage of 3 cloud layers (0-1 range)
         """
         super().__init__(dref="sim/weather/region/cloud_coverage_percent",
                          value=value)
@@ -51,10 +59,12 @@ class Weather:
     def __init__(self,
                  change_mode: ChangeMode,
                  cloud_base_msl: CloudBaseMsl,
+                 cloud_top_msl: CloudTopMsl,
                  cloud_coverage: CloudCoverage):
         self.change_mode = change_mode
         # clouds
         self.cloud_base_msl = cloud_base_msl
+        self.cloud_top_msl = cloud_top_msl
         self.cloud_coverage = cloud_coverage
     
     def __iter__(self):
