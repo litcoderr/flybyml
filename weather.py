@@ -101,6 +101,36 @@ class Temperature(WeatherProperty):
         super().__init__(dref="sim/weather/region/sealevel_temperature_c",
                          value=value)
 
+"""
+Wind
+- at most 13 wind layers
+Note that Xplane doesn't let you explicitly set the exact value of each property.
+Xplane modifies the values based on physics engine.
+"""
+class WindMsl(WeatherProperty):
+    def __init__(self, value: List[float]):
+        """
+        MSL altitude of 13 wind layers (MSL meters)
+        wind layer should be atleast 1000ft apart
+        """
+        super().__init__(dref="sim/weather/region/wind_altitude_msl_m",
+                         value=value)
+
+class WindDirection(WeatherProperty):
+    def __init__(self, value: List[float]):
+        """
+        Direction of 13 wind layers (0-360 degrees)
+        """
+        super().__init__(dref="sim/weather/region/wind_direction_degt",
+                         value=value)
+
+class WindSpeed(WeatherProperty):
+    def __init__(self, value: List[float]):
+        """
+        Speed of 13 wind layers (>=0 m/s)
+        """
+        super().__init__(dref="sim/weather/region/wind_speed_msc",
+                         value=value)
 
 class Weather:
     def __init__(self,
@@ -111,7 +141,10 @@ class Weather:
                  cloud_type: CloudType,
                  precipitation: Precipitation,
                  runway_wetness: RunwayWetness,
-                 temperature: Temperature):
+                 temperature: Temperature,
+                 wind_msl: WindMsl,
+                 wind_direction: WindDirection,
+                 wind_speed: WindSpeed):
         self.change_mode = change_mode
         # clouds
         self.cloud_base_msl = cloud_base_msl
@@ -121,3 +154,6 @@ class Weather:
         self.precipitation = precipitation
         self.runway_wetness = runway_wetness
         self.temperature = temperature
+        self.wind_msl = wind_msl
+        self.wind_direction = wind_direction
+        self.wind_speed = wind_speed
