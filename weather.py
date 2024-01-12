@@ -141,6 +141,22 @@ class WindTurbulence(WeatherProperty):
         super().__init__(dref="sim/weather/region/turbulence",
                          value=value)
 
+class WindShearDirection(WeatherProperty):
+    def __init__(self, value: List[float]):
+        """
+        Wind shear direction (0-360 degrees)
+        """
+        super().__init__(dref="sim/weather/region/shear_direction_degt",
+                         value=value)
+
+class WindShearMaxSpeed(WeatherProperty):
+    def __init__(self, value: List[float]):
+        """
+        Max wind shear speed (m/s)
+        """
+        super().__init__(dref="sim/weather/region/shear_speed_msc",
+                         value=value)
+
 class Weather:
     def __init__(self,
                  change_mode: ChangeMode,
@@ -154,7 +170,9 @@ class Weather:
                  wind_msl: WindMsl,
                  wind_direction: WindDirection,
                  wind_speed: WindSpeed,
-                 wind_turbulence: WindTurbulence):
+                 wind_turbulence: WindTurbulence,
+                 wind_shear_direction: WindShearDirection,
+                 wind_shear_max_speed: WindShearMaxSpeed):
         self.change_mode = change_mode
         # clouds
         self.cloud_base_msl = cloud_base_msl
@@ -168,3 +186,5 @@ class Weather:
         self.wind_direction = wind_direction
         self.wind_speed = wind_speed
         self.wind_turbulence = wind_turbulence
+        self.wind_shear_direction = wind_shear_direction
+        self.wind_shear_max_speed = wind_shear_max_speed

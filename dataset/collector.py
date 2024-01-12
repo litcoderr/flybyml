@@ -13,7 +13,7 @@ from environment import XplaneEnvironment
 from weather import Weather, ChangeMode, \
     CloudBaseMsl, CloudTopMsl, CloudCoverage, CloudType, \
     Precipitation, RunwayWetness, Temperature, \
-    WindMsl, WindDirection, WindSpeed, WindTurbulence
+    WindMsl, WindDirection, WindSpeed, WindTurbulence, WindShearDirection, WindShearMaxSpeed
 
 
 class Config:
@@ -43,13 +43,13 @@ def sample_zulu_time() -> float:
     returns GMT time. seconds since midnight
     """
     seconds_per_day = 86400
-    # TODO return seconds_per_day * random.random()
-    return 200 * 60
+    return seconds_per_day * random.random()
 
 def sample_weather() -> Weather:
     """
     returns sampled Weather object
     """
+    # TODO sample weather properties by implementing sample method to weather
     weather = Weather(
         change_mode = ChangeMode(0),
         cloud_base_msl = CloudBaseMsl([500*0.3, 0, 0]),
@@ -60,22 +60,23 @@ def sample_weather() -> Weather:
         runway_wetness = RunwayWetness(0),
         temperature = Temperature(-30),
         wind_msl = WindMsl([1000*0.3, 2100*0.3,0,0,0,0,0,0,0,0,0,0,0]),
-        wind_direction = WindDirection([10,12,0,0,0,0,0,0,0,0,0,0,0]),
+        wind_direction = WindDirection([100,120,0,0,0,0,0,0,0,0,0,0,0]),
         wind_speed = WindSpeed([5,10,0,0,0,0,0,0,0,0,0,0,0]),
-        wind_turbulence = WindTurbulence([0.5,0.5,0,0,0,0,0,0,0,0,0,0,0])
+        wind_turbulence = WindTurbulence([0.5,0.5,0,0,0,0,0,0,0,0,0,0,0]),
+        wind_shear_direction = WindShearDirection([100,120,0,0,0,0,0,0,0,0,0,0,0]),
+        wind_shear_max_speed = WindShearMaxSpeed([5,10,0,0,0,0,0,0,0,0,0,0,0])
     )
-    # TODO sample weather properties by implementing sample method to weather
     return weather
 
 if __name__ == "__main__":
+    # TODO randomize configuration for every run
+    Config.init_zulu_time = sample_zulu_time()
+    Config.weather = sample_weather()
+
     # set up human agent and environment
     human = HumanAgent(Config.aircraft)
     env = XplaneEnvironment(agent = human)
     human.set_api(env.api)
-
-    # TODO randomize configuration for every run
-    Config.init_zulu_time = sample_zulu_time()
-    Config.weather = sample_weather()
 
     state = env.reset(
         lat = Config.init_pos.lat,
