@@ -10,7 +10,7 @@ from controls import Controls
 from agent import AgentInterface
 from api import API
 from environment import XplaneEnvironment
-from weather import Weather, ChangeMode
+from weather import Weather, ChangeMode, CloudBaseMsl, CloudCoverage
 
 
 class Config:
@@ -40,16 +40,20 @@ def sample_zulu_time() -> float:
     returns GMT time. seconds since midnight
     """
     seconds_per_day = 86400
-    return seconds_per_day * random.random()
+    # TODO return seconds_per_day * random.random()
+    return 200 * 60
 
 def sample_weather() -> Weather:
     """
     returns sampled Weather object
     """
-    # TODO sample weather properties
-    return Weather(
-        change_mode = ChangeMode(0)
+    weather = Weather(
+        change_mode = ChangeMode(0),
+        cloud_base_msl = CloudBaseMsl([500*0.3, 0, 0]),
+        cloud_coverage = CloudCoverage([10, 0, 0])
     )
+    # TODO sample weather properties by implementing sample method to weather
+    return weather
 
 if __name__ == "__main__":
     # set up human agent and environment

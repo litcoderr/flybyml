@@ -191,6 +191,7 @@ class API(object):
         # set dref of all Weather properties
         for prop in weather.__dict__.values():
             set_dref(prop.dref, prop.value)
+        set_dref('sim/weather/region/update_immediately', True)
     
     def pause(self):
         with xpc.XPlaneConnect() as client:
