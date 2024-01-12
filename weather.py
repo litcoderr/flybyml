@@ -106,6 +106,7 @@ Wind
 - at most 13 wind layers
 Note that Xplane doesn't let you explicitly set the exact value of each property.
 Xplane modifies the values based on physics engine.
+Input at least 2 wind layers.
 """
 class WindMsl(WeatherProperty):
     def __init__(self, value: List[float]):
@@ -132,6 +133,14 @@ class WindSpeed(WeatherProperty):
         super().__init__(dref="sim/weather/region/wind_speed_msc",
                          value=value)
 
+class WindTurbulence(WeatherProperty):
+    def __init__(self, value: List[float]):
+        """
+        Magnitude of turbulence (0-1)
+        """
+        super().__init__(dref="sim/weather/region/turbulence",
+                         value=value)
+
 class Weather:
     def __init__(self,
                  change_mode: ChangeMode,
@@ -144,7 +153,8 @@ class Weather:
                  temperature: Temperature,
                  wind_msl: WindMsl,
                  wind_direction: WindDirection,
-                 wind_speed: WindSpeed):
+                 wind_speed: WindSpeed,
+                 wind_turbulence: WindTurbulence):
         self.change_mode = change_mode
         # clouds
         self.cloud_base_msl = cloud_base_msl
@@ -157,3 +167,4 @@ class Weather:
         self.wind_msl = wind_msl
         self.wind_direction = wind_direction
         self.wind_speed = wind_speed
+        self.wind_turbulence = wind_turbulence

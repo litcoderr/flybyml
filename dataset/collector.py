@@ -13,7 +13,7 @@ from environment import XplaneEnvironment
 from weather import Weather, ChangeMode, \
     CloudBaseMsl, CloudTopMsl, CloudCoverage, CloudType, \
     Precipitation, RunwayWetness, Temperature, \
-    WindMsl, WindDirection, WindSpeed
+    WindMsl, WindDirection, WindSpeed, WindTurbulence
 
 
 class Config:
@@ -59,9 +59,10 @@ def sample_weather() -> Weather:
         precipitation = Precipitation(0),
         runway_wetness = RunwayWetness(0),
         temperature = Temperature(-30),
-        wind_msl = WindMsl([1000*0.3, 2000*0.3,0,0,0,0,0,0,0,0,0,0,0]),
+        wind_msl = WindMsl([1000*0.3, 2100*0.3,0,0,0,0,0,0,0,0,0,0,0]),
         wind_direction = WindDirection([10,12,0,0,0,0,0,0,0,0,0,0,0]),
-        wind_speed = WindSpeed([15,20,0,0,0,0,0,0,0,0,0,0,0])
+        wind_speed = WindSpeed([5,10,0,0,0,0,0,0,0,0,0,0,0]),
+        wind_turbulence = WindTurbulence([0.5,0.5,0,0,0,0,0,0,0,0,0,0,0])
     )
     # TODO sample weather properties by implementing sample method to weather
     return weather
