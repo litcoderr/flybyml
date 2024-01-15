@@ -1,6 +1,7 @@
 from typing import Optional
 
 import random
+import numpy as np
 
 from util import ft_to_me, haversine_distance_and_bearing
 from aircraft import Aircraft
@@ -47,20 +48,31 @@ def sample_zulu_time() -> float:
     seconds_per_day = 86400
     return seconds_per_day * random.random()
 
-def sample_weather() -> Weather:
+def sample_weather(apt_elev: float) -> Weather:
     """
+    apt_elev: airport elevation in meters
     returns sampled Weather object
     """
-    # TODO sample weather properties by implementing sample method to weather
+    # sample cloud
+    cloud_base_msl = apt_elev + random.uniform(ft_to_me(1000), ft_to_me(4000))
+    cloud_top_msl = random.uniform(cloud_base_msl + ft_to_me(1000), cloud_base_msl + ft_to_me(4000))
+    cloud_coverage = random.uniform(0, 1)
+    cloud_type = np.random.choice(np.arange(0, 4), p=[0.3, 0.3, 0.3, 0.1])
+
+    # TODO sample precipitation and wind
+
     weather = Weather(
-        change_mode = ChangeMode(0),
-        cloud_base_msl = CloudBaseMsl([500*0.3, 0, 0]),
-        cloud_top_msl = CloudTopMsl([600*0.3, 0, 0]),
-        cloud_coverage = CloudCoverage([0.3, 0, 0]),
-        cloud_type = CloudType([1, 0, 0]),
+        change_mode = ChangeMode(random.randint(0, 6)),
+
+        cloud_base_msl = CloudBaseMsl([cloud_base_msl, 0, 0]),
+        cloud_top_msl = CloudTopMsl([cloud_top_msl, 0, 0]),
+        cloud_coverage = CloudCoverage([cloud_coverage, 0, 0]),
+        cloud_type = CloudType([cloud_type, 0, 0]),
+
         precipitation = Precipitation(0),
         runway_wetness = RunwayWetness(0),
         temperature = Temperature(-30),
+
         wind_msl = WindMsl([1000*0.3, 2100*0.3,0,0,0,0,0,0,0,0,0,0,0]),
         wind_direction = WindDirection([100,120,0,0,0,0,0,0,0,0,0,0,0]),
         wind_speed = WindSpeed([5,10,0,0,0,0,0,0,0,0,0,0,0]),
@@ -71,6 +83,11 @@ def sample_weather() -> Weather:
     return weather
 
 if __name__ == "__main__":
+    # set up human agent and environment
+    human = HumanAgent(Config.aircraft)
+    env = XplaneEnvironment(agent = human)
+    human.set_api(env.api)
+
     while True:
         # randomize configuration
         target_rwy, init_lat, init_lon = sample_tgt_rwy_and_position()
@@ -78,13 +95,7 @@ if __name__ == "__main__":
         Config.init_pos.lon = init_lon
         Config.init_pos.alt = random.uniform(target_rwy.elev+ft_to_me(3000), target_rwy.elev+ft_to_me(5000))
         Config.init_zulu_time = sample_zulu_time()
-        Config.weather = sample_weather()
-
-        # set up human agent and environment
-        human = HumanAgent(Config.aircraft)
-        env = XplaneEnvironment(agent = human)
-        human.set_api(env.api)
-
+        Config.weather = sample_weather(target_rwy.elev)
 
         state = env.reset(
             lat = Config.init_pos.lat,
@@ -99,7 +110,6 @@ if __name__ == "__main__":
         prev_state: Optional[PlaneState] = None
         while True:
             state, controls, abs_time = env.step()
-            
             if prev_state is not None:
                 dist, _ = haversine_distance_and_bearing(prev_state.pos.lat, prev_state.pos.lon, 0,
                                                          state.pos.lat, state.pos.lon, 0)

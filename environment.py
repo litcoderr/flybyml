@@ -39,9 +39,14 @@ class XplaneEnvironment:
         return state
     
     def step(self, **kwargs) -> Tuple[PlaneState, Controls, float]:
-        current_state = self.getState()
-        controls = self.agent.sample_action(current_state)
-        self.api.send_ctrl(controls)
+        while True:
+            try:
+                current_state = self.getState()
+                controls = self.agent.sample_action(current_state)
+                self.api.send_ctrl(controls)
+                break
+            except:
+                time.sleep(0.1)
         return current_state, controls, time.time()
 
     def getState(self) -> PlaneState:
