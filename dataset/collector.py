@@ -2,7 +2,7 @@ from typing import Optional
 
 import random
 
-from util import ft_to_me
+from util import ft_to_me, haversine_distance_and_bearing
 from aircraft import Aircraft
 from aircraft.b738 import B738
 from state.pos import Position
@@ -71,29 +71,38 @@ def sample_weather() -> Weather:
     return weather
 
 if __name__ == "__main__":
-    # randomize configuration
-    target_rwy, init_lat, init_lon = sample_tgt_rwy_and_position()
-    Config.init_pos.lat = init_lat
-    Config.init_pos.lon = init_lon
-    Config.init_pos.alt = random.uniform(target_rwy.elev+ft_to_me(3000), target_rwy.elev+ft_to_me(5000))
-    Config.init_zulu_time = sample_zulu_time()
-    Config.weather = sample_weather()
-
-    # set up human agent and environment
-    human = HumanAgent(Config.aircraft)
-    env = XplaneEnvironment(agent = human)
-    human.set_api(env.api)
-
-
-    state = env.reset(
-        lat = Config.init_pos.lat,
-        lon = Config.init_pos.lon,
-        alt = Config.init_pos.alt,
-        heading = Config.init_heading,
-        spd = Config.init_speed,
-        zulu_time = Config.init_zulu_time,
-        weather = Config.weather
-    )
-
     while True:
-        state, controls, abs_time = env.step()
+        # randomize configuration
+        target_rwy, init_lat, init_lon = sample_tgt_rwy_and_position()
+        Config.init_pos.lat = init_lat
+        Config.init_pos.lon = init_lon
+        Config.init_pos.alt = random.uniform(target_rwy.elev+ft_to_me(3000), target_rwy.elev+ft_to_me(5000))
+        Config.init_zulu_time = sample_zulu_time()
+        Config.weather = sample_weather()
+
+        # set up human agent and environment
+        human = HumanAgent(Config.aircraft)
+        env = XplaneEnvironment(agent = human)
+        human.set_api(env.api)
+
+
+        state = env.reset(
+            lat = Config.init_pos.lat,
+            lon = Config.init_pos.lon,
+            alt = Config.init_pos.alt,
+            heading = Config.init_heading,
+            spd = Config.init_speed,
+            zulu_time = Config.init_zulu_time,
+            weather = Config.weather
+        )
+
+        prev_state: Optional[PlaneState] = None
+        while True:
+            state, controls, abs_time = env.step()
+            
+            if prev_state is not None:
+                dist, _ = haversine_distance_and_bearing(prev_state.pos.lat, prev_state.pos.lon, 0,
+                                                         state.pos.lat, state.pos.lon, 0)
+                if dist < 0.5:
+                    break
+            prev_state = state
