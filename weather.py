@@ -136,7 +136,7 @@ class WindSpeed(WeatherProperty):
 class WindTurbulence(WeatherProperty):
     def __init__(self, value: List[float]):
         """
-        Magnitude of turbulence (0-1)
+        Magnitude of turbulence (0-1) of 13 wind layers
         """
         super().__init__(dref="sim/weather/region/turbulence",
                          value=value)
@@ -144,7 +144,7 @@ class WindTurbulence(WeatherProperty):
 class WindShearDirection(WeatherProperty):
     def __init__(self, value: List[float]):
         """
-        Wind shear direction (0-360 degrees)
+        Wind shear direction (0-360 degrees) of 13 wind layers
         """
         super().__init__(dref="sim/weather/region/shear_direction_degt",
                          value=value)
@@ -152,7 +152,7 @@ class WindShearDirection(WeatherProperty):
 class WindShearMaxSpeed(WeatherProperty):
     def __init__(self, value: List[float]):
         """
-        Max wind shear speed (m/s)
+        Max wind shear speed (m/s) of 13 wind layers
         """
         super().__init__(dref="sim/weather/region/shear_speed_msc",
                          value=value)
