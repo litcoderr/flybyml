@@ -1,7 +1,9 @@
 from typing import Optional
 
+import time
 import random
 import numpy as np
+from queue import Queue
 
 from util import ft_to_me, haversine_distance_and_bearing, kts_to_mps
 from aircraft import Aircraft
@@ -17,6 +19,7 @@ from weather import Weather, ChangeMode, \
     CloudBaseMsl, CloudTopMsl, CloudCoverage, CloudType, \
     Precipitation, RunwayWetness, Temperature, \
     WindMsl, WindDirection, WindSpeed, WindTurbulence, WindShearDirection, WindShearMaxSpeed
+from dataset.atc import ATC
 
 
 class Config:
@@ -70,7 +73,6 @@ def sample_weather(apt_elev: float) -> Weather:
         else:
             runway_wetness = 7 + 6 * precipitation - random.uniform(-1, 0)
 
-    # TODO sample wind
     wind_msl = random.uniform(apt_elev + ft_to_me(50), cloud_top_msl)
     wind_direction = random.uniform(0, 360)
     wind_speed = random.uniform(0, kts_to_mps(16))
@@ -127,12 +129,22 @@ if __name__ == "__main__":
             weather = Config.weather
         )
 
+        # initialize atc
+        queue = Queue()
+        atc = ATC(queue, target_rwy)
+        atc.start()
+
+        # run simulation until end of session
         prev_state: Optional[PlaneState] = None
         while True:
             state, controls, abs_time = env.step()
+            queue.put({"timestamp": time.time(), "is_running": True, "state": state})
             if prev_state is not None:
                 dist, _ = haversine_distance_and_bearing(prev_state.pos.lat, prev_state.pos.lon, 0,
                                                          state.pos.lat, state.pos.lon, 0)
                 if dist < 0.5:
                     break
             prev_state = state
+
+        queue.put({"timestamp": time.time(), "is_running": False})
+        atc.join()
