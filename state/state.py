@@ -1,4 +1,3 @@
-import torch
 from .pos import Position
 from .att import Attitude
 

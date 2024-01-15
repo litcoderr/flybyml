@@ -110,6 +110,7 @@ if __name__ == "__main__":
         prev_state: Optional[PlaneState] = None
         while True:
             state, controls, abs_time = env.step()
+            print(state)
             if prev_state is not None:
                 dist, _ = haversine_distance_and_bearing(prev_state.pos.lat, prev_state.pos.lon, 0,
                                                          state.pos.lat, state.pos.lon, 0)

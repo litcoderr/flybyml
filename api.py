@@ -174,11 +174,15 @@ class API(object):
         set_dref("sim/cockpit2/controls/elevator_trim", value)
     
     def get_indicated_airspeed(self):
-        # m / s
-        return get_dref('sim/flightmodel/position/indicated_airspeed')[0]
+        """
+        returns in m/s
+        """
+        return get_dref('sim/flightmodel/position/indicated_airspeed')[0] * 1.94384
     
     def get_vertical_speed(self):
-        # m / s
+        """
+        returns in m/s
+        """
         fpm = get_dref('sim/cockpit2/tcas/targets/position/vertical_speed')[0]
         mps = fpm * (0.3048 / 60)
         return mps
