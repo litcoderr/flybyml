@@ -2,12 +2,14 @@ from typing import Optional
 
 import random
 
+from util import ft_to_me
 from aircraft import Aircraft
 from aircraft.b738 import B738
 from state.pos import Position
 from state.state import PlaneState
 from controls import Controls
 from agent import AgentInterface
+from airport import sample_tgt_rwy_and_position
 from api import API
 from environment import XplaneEnvironment
 from weather import Weather, ChangeMode, \
@@ -69,7 +71,11 @@ def sample_weather() -> Weather:
     return weather
 
 if __name__ == "__main__":
-    # TODO randomize configuration for every run
+    # randomize configuration
+    target_rwy, init_lat, init_lon = sample_tgt_rwy_and_position()
+    Config.init_pos.lat = init_lat
+    Config.init_pos.lon = init_lon
+    Config.init_pos.alt = random.uniform(target_rwy.elev+ft_to_me(3000), target_rwy.elev+ft_to_me(5000))
     Config.init_zulu_time = sample_zulu_time()
     Config.weather = sample_weather()
 
@@ -77,6 +83,7 @@ if __name__ == "__main__":
     human = HumanAgent(Config.aircraft)
     env = XplaneEnvironment(agent = human)
     human.set_api(env.api)
+
 
     state = env.reset(
         lat = Config.init_pos.lat,
