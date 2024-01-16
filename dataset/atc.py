@@ -10,7 +10,7 @@ from util import offset_coord, ft_to_me, me_to_ft, haversine_distance_and_bearin
 from airport import Runway
 from state.state import PlaneState
 from dataset.audio import play_fly_heading, play_altitude, play_downwind, play_base, play_final, \
-                          nominal, left, far_left, right, far_right, glidpath
+                          nominal, left, far_left, right, far_right, glidpath, altitude, low, too_low, high, too_high
 
 
 class Command:
@@ -42,6 +42,8 @@ class LandingCallout:
 
         self.nominal_degree = 1
         self.correction_degree = 5
+        self.nominal_alt = 10 # feet
+        self.correction_alt = 50 # feet
     
     def commence(self):
         dist_rwy, heading_rwy = haversine_distance_and_bearing(
@@ -77,7 +79,21 @@ class LandingCallout:
                 else:
                     play(far_left)
         
-        # TODO altitude callout
+        # altitude callout
+        if me_to_ft(abs(alt_diff)) < self.nominal_alt:
+            play(altitude)
+            play(nominal)
+        else:
+            if alt_diff < 0:  # low
+                if me_to_ft(abs(alt_diff)) <= self.correction_alt:
+                    play(low)
+                else:
+                    play(too_low)
+            else:  # high
+                if me_to_ft(abs(alt_diff)) <= self.correction_alt:
+                    play(high)
+                else:
+                    play(too_high)
 
 
 class Stage:
