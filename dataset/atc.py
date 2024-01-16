@@ -4,11 +4,13 @@ import time
 import math
 from threading import Thread
 from queue import Queue
+from pydub.playback import play
 
 from util import offset_coord, ft_to_me, me_to_ft, haversine_distance_and_bearing
 from airport import Runway
 from state.state import PlaneState
-from dataset.audio import play_fly_heading, play_altitude, play_downwind, play_base, play_final
+from dataset.audio import play_fly_heading, play_altitude, play_downwind, play_base, play_final, \
+                          nominal, left, far_left, right, far_right, glidpath
 
 
 class Command:
@@ -26,6 +28,56 @@ class Command:
     def commence(self):
         play_fly_heading(str(int(self.desired_heading)).zfill(3))
         play_altitude(me_to_ft(self.desired_altitude), me_to_ft(self.desired_altitude - self.state.pos.alt))
+
+
+class LandingCallout:
+    def __init__(self, state: PlaneState, tgt_rwy: Runway):
+        """
+        state: PlaneState
+        tgt_rwy: Runway
+        """
+        self.time = time.time()
+        self.state = state
+        self.tgt_rwy = tgt_rwy
+
+        self.nominal_degree = 1
+        self.correction_degree = 5
+    
+    def commence(self):
+        dist_rwy, heading_rwy = haversine_distance_and_bearing(
+            lat1 = self.state.pos.lat,
+            lon1 = self.state.pos.lon,
+            ele1 = 0,
+            lat2 = self.tgt_rwy.lat,
+            lon2 = self.tgt_rwy.lon,
+            ele2 = 0
+        )
+        tgt_alt = self.tgt_rwy.elev + dist_rwy * math.tan(math.radians(3))
+
+        # altitude difference in meters
+        alt_diff = self.state.pos.alt - tgt_alt
+        
+        # heading difference in radians
+        heading_diff = math.radians(heading_rwy) - math.radians(self.tgt_rwy.bearing)
+
+        # heading callout
+        if math.degrees(abs(heading_diff)) < self.nominal_degree:
+            play(glidpath)
+            play(nominal)
+            play_fly_heading(str(int(heading_rwy)).zfill(3))
+        else:
+            if heading_diff < 0:  # on the right side of the runway
+                if math.degrees(abs(heading_diff)) <= self.correction_degree:
+                    play(right)
+                else:
+                    play(far_right)
+            else:  # on the left side of the runway
+                if math.degrees(abs(heading_diff)) <= self.correction_degree:
+                    play(left)
+                else:
+                    play(far_left)
+        
+        # TODO altitude callout
 
 
 class Stage:
@@ -78,10 +130,33 @@ class Stage:
 class Final(Stage):
     def __init__(self, tgt_rwy: Runway):
         super().__init__(tgt_rwy)
+        self.alert_period = 5
+        self.has_commenced_heading = False
+
         play_final()
     
     def update(self, state: PlaneState) -> bool:
-        # TODO
+        if not self.has_commenced_heading:
+            dist_rwy, heading_rwy = haversine_distance_and_bearing(
+                lat1 = state.pos.lat,
+                lon1 = state.pos.lon,
+                ele1 = 0,
+                lat2 = self.tgt_rwy.lat,
+                lon2 = self.tgt_rwy.lon,
+                ele2 = 0
+            )
+            tgt_alt = self.tgt_rwy.elev + dist_rwy * math.tan(math.radians(3))
+
+            Command(state, heading_rwy, tgt_alt).commence()
+            self.has_commenced_heading = True
+
+        if self.command is None:
+            self.command = LandingCallout(state, self.tgt_rwy) 
+            self.command.commence()
+        elif time.time() - self.command.time >= self.alert_period:
+            self.command = LandingCallout(state, self.tgt_rwy) 
+            self.command.commence()
+
         return False
 
 

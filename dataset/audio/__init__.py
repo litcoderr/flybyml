@@ -23,6 +23,12 @@ numeric = {
 }
 thousand = AudioSegment.from_wav(AUDIO_ROOT / "thousand.wav")
 hundred = AudioSegment.from_wav(AUDIO_ROOT / "hundred.wav")
+glidpath = AudioSegment.from_wav(AUDIO_ROOT / "glidepath.wav")
+nominal = AudioSegment.from_wav(AUDIO_ROOT / "nominal.wav")
+left = AudioSegment.from_wav(AUDIO_ROOT / "left.wav")
+far_left = AudioSegment.from_wav(AUDIO_ROOT / "far_left.wav")
+right = AudioSegment.from_wav(AUDIO_ROOT / "right.wav")
+far_right = AudioSegment.from_wav(AUDIO_ROOT / "far_right.wav")
 
 def play_downwind():
     play(AudioSegment.from_wav(AUDIO_ROOT / "downwind.wav"))
