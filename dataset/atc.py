@@ -99,21 +99,9 @@ class Base(Stage):
 class Downwind(Stage):
     def __init__(self, tgt_rwy: Runway):
         super().__init__(tgt_rwy)
-
-    def transition(self) -> Base:
-        return Base(self.tgt_rwy)
-
-    def update(self, state: PlaneState) -> bool:
-        # TODO
-        pass
-
-
-class SpeedAltitudeStabilization(Stage):
-    def __init__(self, tgt_rwy: Runway):
-        super().__init__(tgt_rwy)
     
     def transition(self) -> Downwind:
-        return Downwind(self.tgt_rwy)
+        return Base(self.tgt_rwy)
 
     def update(self, state: PlaneState) -> bool:
         acquired = False
@@ -164,7 +152,7 @@ class ATC(Thread):
         self.queue = queue
 
         self.tgt_rwy = tgt_rwy
-        self.stage: Stage = SpeedAltitudeStabilization(self.tgt_rwy)
+        self.stage: Stage = Downwind(self.tgt_rwy)
     
     def run(self):
         print(f"Apt: {self.tgt_rwy.apt_id} Runway: {self.tgt_rwy.rwy_id}")
