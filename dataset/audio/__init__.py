@@ -24,6 +24,14 @@ numeric = {
 thousand = AudioSegment.from_wav(AUDIO_ROOT / "thousand.wav")
 hundred = AudioSegment.from_wav(AUDIO_ROOT / "hundred.wav")
 
+def play_downwind():
+    play(AudioSegment.from_wav(AUDIO_ROOT / "downwind.wav"))
+
+def play_base():
+    play(AudioSegment.from_wav(AUDIO_ROOT / "base.wav"))
+
+def play_final():
+    play(AudioSegment.from_wav(AUDIO_ROOT / "final.wav"))
 
 def play_fly_heading(heading: str):
     """

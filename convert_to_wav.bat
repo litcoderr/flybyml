@@ -4,7 +4,7 @@ cd C:\Users\litco\Desktop\atc_voice_pack
 SETLOCAL ENABLEDELAYEDEXPANSION
 
 REM Directory where the converted files will be saved
-SET "output_dir=..\atc_voice_pack_edit"
+SET "output_dir=..\atc_voice_pack_wav"
 
 REM Create the output directory if it does not exist
 IF NOT EXIST "%output_dir%" mkdir "%output_dir%"

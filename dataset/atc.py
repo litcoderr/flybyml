@@ -8,7 +8,7 @@ from queue import Queue
 from util import offset_coord, ft_to_me, me_to_ft, haversine_distance_and_bearing
 from airport import Runway
 from state.state import PlaneState
-from dataset.audio import play_fly_heading, play_altitude
+from dataset.audio import play_fly_heading, play_altitude, play_downwind, play_base, play_final
 
 
 class Command:
@@ -36,7 +36,7 @@ class Stage:
         self.final = self.calc_final()
         self.base = self.calc_base()
 
-        self.vicinity_threshold = 800  # radius in meters to determine acquired
+        self.vicinity_threshold = 1000  # radius in meters to determine acquired
         self.alert_period = 10  # alert period of command in seconds
         self.command = None
     
@@ -64,13 +64,13 @@ class Stage:
             lat1 = self.final[0],
             lon1 = self.final[1],
             bearing = math.radians(self.tgt_rwy.bearing) + (math.pi / 2),
-            distance = 5000
+            distance = 10000
         )
         base_left = offset_coord(
             lat1 = self.final[0],
             lon1 = self.final[1],
             bearing = math.radians(self.tgt_rwy.bearing) - (math.pi / 2),
-            distance = 5000
+            distance = 10000
         )
         return (base_left, base_right)
 
@@ -78,6 +78,7 @@ class Stage:
 class Final(Stage):
     def __init__(self, tgt_rwy: Runway):
         super().__init__(tgt_rwy)
+        play_final()
     
     def update(self, state: PlaneState) -> bool:
         # TODO
@@ -87,18 +88,20 @@ class Final(Stage):
 class Base(Stage):
     def __init__(self, tgt_rwy: Runway):
         super().__init__(tgt_rwy)
+        play_base()
     
     def transition(self) -> Final:
         return Final(self.tgt_rwy)
 
     def update(self, state: PlaneState) -> bool:
         # TODO
-        pass
+        return False
 
 
 class Downwind(Stage):
     def __init__(self, tgt_rwy: Runway):
         super().__init__(tgt_rwy)
+        play_downwind()
     
     def transition(self) -> Downwind:
         return Base(self.tgt_rwy)
