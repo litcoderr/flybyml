@@ -94,8 +94,38 @@ class Base(Stage):
         return Final(self.tgt_rwy)
 
     def update(self, state: PlaneState) -> bool:
-        # TODO
-        return False
+        acquired = False
+        dist, tgt_heading = haversine_distance_and_bearing(
+            lat1 = state.pos.lat,
+            lon1 = state.pos.lon,
+            ele1 = 0,
+            lat2 = self.final[0],
+            lon2 = self.final[1],
+            ele2 = 0
+        )
+        # this is just the approximation. needs to fly lower
+        dist_rwy, _ = haversine_distance_and_bearing(
+            lat1 = state.pos.lat,
+            lon1 = state.pos.lon,
+            ele1 = 0,
+            lat2 = self.tgt_rwy.lat,
+            lon2 = self.tgt_rwy.lon,
+            ele2 = 0
+        )
+        if dist <= self.vicinity_threshold:
+            acquired = True
+
+        # calculate target altitude (m)
+        tgt_alt = self.tgt_rwy.elev + dist_rwy * math.tan(math.radians(3))
+
+        if not acquired:
+            if self.command is None:
+                self.command = Command(state, tgt_heading, tgt_alt) 
+                self.command.commence()
+            elif time.time() - self.command.time >= self.alert_period:
+                self.command = Command(state, tgt_heading, tgt_alt) 
+                self.command.commence()
+        return acquired
 
 
 class Downwind(Stage):
