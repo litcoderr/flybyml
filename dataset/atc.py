@@ -8,6 +8,7 @@ from queue import Queue
 from util import offset_coord, ft_to_me, me_to_ft, haversine_distance_and_bearing
 from airport import Runway
 from state.state import PlaneState
+from dataset.audio import play_fly_heading
 
 
 class Command:
@@ -23,9 +24,8 @@ class Command:
         self.desired_altitude = desired_altitude
     
     def commence(self):
-        print(f"heading: {self.desired_heading} alt: {me_to_ft(self.desired_altitude)}")
-        # TODO play audio
-        pass
+        play_fly_heading(str(int(self.desired_heading)).zfill(3))
+        # TODO play desired altitude
 
 
 class Stage:
