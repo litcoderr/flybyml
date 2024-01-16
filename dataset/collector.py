@@ -115,7 +115,7 @@ if __name__ == "__main__":
         target_rwy, init_lat, init_lon = sample_tgt_rwy_and_position()
         Config.init_pos.lat = init_lat
         Config.init_pos.lon = init_lon
-        Config.init_pos.alt = random.uniform(target_rwy.elev+ft_to_me(3000), target_rwy.elev+ft_to_me(5000))
+        Config.init_pos.alt = random.uniform(target_rwy.elev+ft_to_me(4000), target_rwy.elev+ft_to_me(5000))
         Config.init_zulu_time = sample_zulu_time()
         Config.weather = sample_weather(target_rwy.elev)
 
