@@ -9,7 +9,6 @@ class WeatherProperty:
         """
         self.dref = dref
         self.value = value
-    # TODO should implement sampling method
 
 class ChangeMode(WeatherProperty):
     def __init__(self, value: int):

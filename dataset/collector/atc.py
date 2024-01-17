@@ -9,7 +9,7 @@ from pydub.playback import play
 from util import offset_coord, ft_to_me, me_to_ft, haversine_distance_and_bearing
 from airport import Runway
 from state.state import PlaneState
-from dataset.audio import play_fly_heading, play_altitude, play_downwind, play_base, play_final, \
+from dataset.collector.audio import play_fly_heading, play_altitude, play_downwind, play_base, play_final, \
                           nominal, left, far_left, right, far_right, glidpath, altitude, low, too_low, high, too_high
 
 
@@ -279,7 +279,6 @@ class ATC(Thread):
         self.stage: Stage = Downwind(self.tgt_rwy)
     
     def run(self):
-        print(f"Apt: {self.tgt_rwy.apt_id} Runway: {self.tgt_rwy.rwy_id}")
         while True:
             msg = self.queue.get()
             if not msg["is_running"]:

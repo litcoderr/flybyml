@@ -162,6 +162,7 @@ class API(object):
             self.set_elev_trim(controls.trim)
     
     def get_ctrl(self) -> Controls:
+        # TODO add brakes, reverse thrust, viewchange actions
         with xpc.XPlaneConnect() as client:
             elev, ail, rud, thr, gear, flaps, _ = client.getCTRL(0)
             trim = self.get_elev_trim()

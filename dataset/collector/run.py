@@ -19,7 +19,8 @@ from weather import Weather, ChangeMode, \
     CloudBaseMsl, CloudTopMsl, CloudCoverage, CloudType, \
     Precipitation, RunwayWetness, Temperature, \
     WindMsl, WindDirection, WindSpeed, WindTurbulence, WindShearDirection, WindShearMaxSpeed
-from dataset.atc import ATC
+from dataset.collector.atc import ATC
+from dataset.collector.gui import StarterGui
 
 
 class Config:
@@ -76,12 +77,12 @@ def sample_weather(apt_elev: float) -> Weather:
     wind_msl = random.uniform(apt_elev + ft_to_me(50), cloud_top_msl)
     wind_direction = random.uniform(0, 360)
     wind_speed = random.uniform(0, kts_to_mps(16))
-    wind_turbulence = np.random.choice(np.arange(0, 1, 0.2), p=[0.3,0.3,0.2,0.1,0.1])
+    wind_turbulence = np.random.choice(np.arange(0, 1, 0.2), p=[0.3,0.4,0.2,0.05,0.05])
     wind_shear_direction = random.uniform(wind_direction-10, wind_direction+10)
     if wind_shear_direction < 0:
         wind_shear_direction += 360
     wind_shear_direction %= 360
-    wind_shear_max_speed = random.uniform(0, kts_to_mps(20))
+    wind_shear_max_speed = np.random.choice(np.arange(0,20,2), p=[0.5,0.2,0.2,0.03,0.02,0.01,0.01,0.01,0.01,0.01])
 
     weather = Weather(
         change_mode = ChangeMode(random.randint(0, 6)),
@@ -128,6 +129,11 @@ if __name__ == "__main__":
             zulu_time = Config.init_zulu_time,
             weather = Config.weather
         )
+        env.api.pause()
+
+        # launch tkinter gui app that shows runway information.
+        starter_gui = StarterGui(env.api, target_rwy)
+        starter_gui.mainloop()
 
         # initialize atc
         queue = Queue()
