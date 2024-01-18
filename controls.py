@@ -1,7 +1,19 @@
 from typing import List
 
+class Camera:
+    def __init__(self, x, y, z, heading, pitch, roll):
+        self.x = x
+        self.y = y
+        self.z = z
+        self.heading = heading
+        self.pitch = pitch
+        self.roll = roll
+    
+    def __str__(self) -> str:
+        return f"x[{self.x}] y[{self.y}] z[{self.z}] heading[{self.heading}] pitch[{self.pitch}] roll[{self.roll}]"
+
 class Controls:
-    def __init__(self, elev, ail, rud, thr, gear, flaps, trim, brake, reverse):
+    def __init__(self, elev, ail, rud, thr, gear, flaps, trim, brake, reverse, camera: Camera):
         """
         lat: [-1, 1]
         lon: [-1, 1]
@@ -22,6 +34,7 @@ class Controls:
         self.trim = trim
         self.brake = brake
         self.reverse = reverse
+        self.camera = camera
     
     def to_api_compatible(self) -> List[float]:
         return [float(self.elev), float(self.ail), float(self.rud), float(self.thr), float(self.gear), float(self.flaps)]

@@ -4,7 +4,7 @@ import socket
 import struct
 import xpc
 
-from controls import Controls
+from controls import Controls, Camera
 from state.att import Attitude
 from state.pos import Position
 from aircraft import Aircraft
@@ -162,6 +162,7 @@ class API(object):
             self.set_elev_trim(controls.trim)
             self.set_brake(controls.brake)
             self.set_reverse_thrust(controls.reverse)
+            # TODO disable camera control when collecting data self.set_camera(controls.camera)
     
     def get_ctrl(self) -> Controls:
         with xpc.XPlaneConnect() as client:
@@ -169,7 +170,26 @@ class API(object):
             trim = self.get_elev_trim()
             brake = self.get_brake()
             reverse = self.get_reverse_thrust()
-            return Controls(elev, ail, rud, thr, gear, flaps, trim, brake, reverse)
+            camera = self.get_camera()
+            return Controls(elev, ail, rud, thr, gear, flaps, trim, brake, reverse, camera)
+
+    def get_camera(self) -> Camera:
+        return Camera(
+            x = get_dref("sim/graphics/view/pilots_head_x")[0],
+            y = get_dref("sim/graphics/view/pilots_head_y")[0],
+            z = get_dref("sim/graphics/view/pilots_head_z")[0],
+            heading = get_dref("sim/graphics/view/pilots_head_psi")[0],
+            pitch = get_dref("sim/graphics/view/pilots_head_the")[0],
+            roll = get_dref("sim/graphics/view/pilots_head_phi")[0]
+        )
+    
+    def set_camera(self, camera: Camera):
+        set_dref("sim/graphics/view/pilots_head_x", camera.x)
+        set_dref("sim/graphics/view/pilots_head_y", camera.y)
+        set_dref("sim/graphics/view/pilots_head_z", camera.z)
+        set_dref("sim/graphics/view/pilots_head_psi", camera.heading)
+        set_dref("sim/graphics/view/pilots_head_the", camera.pitch)
+        set_dref("sim/graphics/view/pilots_head_phi", camera.roll)
     
     def get_reverse_thrust(self) -> float:
         reverse = get_dref("sim/cockpit2/engine/actuators/throttle_jet_rev_ratio_all")[0]
@@ -180,7 +200,7 @@ class API(object):
     
     def set_reverse_thrust(self, value):
         if value < 0:
-            set_dref("sim/cockpit2/engine/actuators/throttle_jet_rev_ratio_all", )
+            set_dref("sim/cockpit2/engine/actuators/throttle_jet_rev_ratio_all", value)
     
     def get_brake(self) -> float:
         return get_dref("sim/cockpit2/controls/parking_brake_ratio")[0]
