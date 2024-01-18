@@ -66,7 +66,8 @@ def play_altitude(altitude: float, diff: float):
     digit_thousand = int(altitude) // 1000
     digit_hundred = int(altitude - digit_thousand * 1000) // 100
     if digit_thousand > 0:
-        play(numeric[str(digit_thousand)])
+        for s in str(digit_thousand):
+            play(numeric[s])
         play(thousand)
     if digit_hundred > 0:
         play(numeric[str(digit_hundred)])

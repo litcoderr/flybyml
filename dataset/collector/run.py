@@ -1,9 +1,14 @@
 from typing import Optional
 
+import os
 import time
 import random
 import numpy as np
 from queue import Queue
+from pathlib import Path
+import pygetwindow as pw
+import pyautogui
+import uuid
 
 from util import ft_to_me, haversine_distance_and_bearing, kts_to_mps
 from aircraft import Aircraft
@@ -105,13 +110,31 @@ def sample_weather(apt_elev: float) -> Weather:
     )
     return weather
 
+def take_screen_shot(root_dir, name):
+    img_path = Path(root_dir) / f"{name}.png"
+    window = pw.getWindowsWithTitle("X-System")
+    x, y, width, height = window[0].left, window[0].top, window[0].width, window[0].height
+    screenshot = pyautogui.screenshot(region=(x, y, width, height))
+    screenshot.save(img_path)
+
 if __name__ == "__main__":
+    DATASET_ROOT = Path('D:\\dataset\\flybyml_dataset')
+    IMG_ROOT = DATASET_ROOT / "image"
+    METADATA_ROOT = DATASET_ROOT / "metadata"
+    os.makedirs(DATASET_ROOT, exist_ok=True)
+    os.makedirs(IMG_ROOT, exist_ok=True)
+    os.makedirs(METADATA_ROOT, exist_ok=True)
+
     # set up human agent and environment
     human = HumanAgent(Config.aircraft)
     env = XplaneEnvironment(agent = human)
     human.set_api(env.api)
 
     while True:
+        session_id = str(uuid.uuid4())
+        session_dir = IMG_ROOT / session_id
+        os.makedirs(session_dir, exist_ok=True)
+
         # randomize configuration
         target_rwy, init_lat, init_lon = sample_tgt_rwy_and_position()
         Config.init_pos.lat = init_lat
@@ -134,6 +157,8 @@ if __name__ == "__main__":
         # launch tkinter gui app that shows runway information.
         starter_gui = StarterGui(env.api, target_rwy)
         starter_gui.mainloop()
+        window = pw.getWindowsWithTitle("X-System")
+        window[0].activate()
 
         # initialize atc
         queue = Queue()
@@ -142,15 +167,24 @@ if __name__ == "__main__":
 
         # run simulation until end of session
         prev_state: Optional[PlaneState] = None
+        step_id = 0
         while True:
             state, controls, abs_time = env.step()
+            # TODO take screenshot
+            take_screen_shot(session_dir, str(step_id).zfill(5))
+            # TODO write data
+
+            # send atc plane's state
             queue.put({"timestamp": time.time(), "is_running": True, "state": state})
+
+            # stopping session if plane is not moving
             if prev_state is not None:
                 dist, _ = haversine_distance_and_bearing(prev_state.pos.lat, prev_state.pos.lon, 0,
                                                          state.pos.lat, state.pos.lon, 0)
                 if dist < 0.5:
                     break
             prev_state = state
+            step_id += 1
 
         queue.put({"timestamp": time.time(), "is_running": False})
         atc.join()
