@@ -161,20 +161,31 @@ class API(object):
             client.sendCTRL(controls.to_api_compatible())
             self.set_elev_trim(controls.trim)
             self.set_brake(controls.brake)
-            # TODO add brakes, reverse thrust, viewchange actions
+            self.set_reverse_thrust(controls.reverse)
     
     def get_ctrl(self) -> Controls:
-        # TODO add brakes, reverse thrust, viewchange actions
         with xpc.XPlaneConnect() as client:
             elev, ail, rud, thr, gear, flaps, _ = client.getCTRL(0)
             trim = self.get_elev_trim()
             brake = self.get_brake()
-            return Controls(elev, ail, rud, thr, gear, flaps, trim, brake)
+            reverse = self.get_reverse_thrust()
+            return Controls(elev, ail, rud, thr, gear, flaps, trim, brake, reverse)
+    
+    def get_reverse_thrust(self) -> float:
+        reverse = get_dref("sim/cockpit2/engine/actuators/throttle_jet_rev_ratio_all")[0]
+        if reverse >= 0:
+            return 0.
+        else:
+            return reverse
+    
+    def set_reverse_thrust(self, value):
+        if value < 0:
+            set_dref("sim/cockpit2/engine/actuators/throttle_jet_rev_ratio_all", )
     
     def get_brake(self) -> float:
         return get_dref("sim/cockpit2/controls/parking_brake_ratio")[0]
     
-    def set_brake(self, value) -> float:
+    def set_brake(self, value):
         """
         value: brake force applied [0, 1]
         """

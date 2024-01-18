@@ -1,7 +1,7 @@
 from typing import List
 
 class Controls:
-    def __init__(self, elev, ail, rud, thr, gear, flaps, trim, brake):
+    def __init__(self, elev, ail, rud, thr, gear, flaps, trim, brake, reverse):
         """
         lat: [-1, 1]
         lon: [-1, 1]
@@ -11,6 +11,7 @@ class Controls:
         flaps: [0, 1]
         trim: [-1, 1]
         brake: [0, 1]
+        reverse: [-1 / 0] -1: reverse thrust fully deployed
         """
         self.elev = elev
         self.ail = ail
@@ -20,6 +21,7 @@ class Controls:
         self.flaps = flaps
         self.trim = trim
         self.brake = brake
+        self.reverse = reverse
     
     def to_api_compatible(self) -> List[float]:
         return [float(self.elev), float(self.ail), float(self.rud), float(self.thr), float(self.gear), float(self.flaps)]
