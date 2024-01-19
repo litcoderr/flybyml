@@ -111,10 +111,11 @@ def sample_weather(apt_elev: float) -> Weather:
     return weather
 
 def take_screen_shot(root_dir, name):
-    img_path = Path(root_dir) / f"{name}.png"
+    img_path = Path(root_dir) / f"{name}.jpg"  # TODO use jpg for smaller size
     window = pw.getWindowsWithTitle("X-System")
     x, y, width, height = window[0].left, window[0].top, window[0].width, window[0].height
     screenshot = pyautogui.screenshot(region=(x, y, width, height))
+    # TODO maybe resize to make image smaller
     screenshot.save(img_path)
 
 if __name__ == "__main__":
@@ -170,7 +171,6 @@ if __name__ == "__main__":
         step_id = 0
         while True:
             state, controls, abs_time = env.step()
-            # TODO take screenshot
             take_screen_shot(session_dir, str(step_id).zfill(5))
             # TODO write data
 

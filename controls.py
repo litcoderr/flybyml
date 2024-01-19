@@ -13,7 +13,7 @@ class Camera:
         return f"x[{self.x}] y[{self.y}] z[{self.z}] heading[{self.heading}] pitch[{self.pitch}] roll[{self.roll}]"
 
 class Controls:
-    def __init__(self, elev, ail, rud, thr, gear, flaps, trim, brake, reverse, camera: Camera):
+    def __init__(self, elev, ail, rud, thr, gear, flaps, trim, brake, spd_brake, reverse, camera: Camera):
         """
         lat: [-1, 1]
         lon: [-1, 1]
@@ -23,6 +23,7 @@ class Controls:
         flaps: [0, 1]
         trim: [-1, 1]
         brake: [0, 1]
+        spd_brake: [0, 1]
         reverse: [-1 / 0] -1: reverse thrust fully deployed
         """
         self.elev = elev
@@ -33,6 +34,7 @@ class Controls:
         self.flaps = flaps
         self.trim = trim
         self.brake = brake
+        self.spd_brake = spd_brake
         self.reverse = reverse
         self.camera = camera
     

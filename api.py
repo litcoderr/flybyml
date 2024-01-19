@@ -161,17 +161,19 @@ class API(object):
             client.sendCTRL(controls.to_api_compatible())
             self.set_elev_trim(controls.trim)
             self.set_brake(controls.brake)
+            self.set_speedbrake(controls.spd_brake)
             self.set_reverse_thrust(controls.reverse)
-            # TODO disable camera control when collecting data self.set_camera(controls.camera)
+            # TODO disable camera control when collecting data. self.set_camera(controls.camera)
     
     def get_ctrl(self) -> Controls:
         with xpc.XPlaneConnect() as client:
             elev, ail, rud, thr, gear, flaps, _ = client.getCTRL(0)
             trim = self.get_elev_trim()
             brake = self.get_brake()
+            spd_brake = self.get_speedbrake()
             reverse = self.get_reverse_thrust()
             camera = self.get_camera()
-            return Controls(elev, ail, rud, thr, gear, flaps, trim, brake, reverse, camera)
+            return Controls(elev, ail, rud, thr, gear, flaps, trim, brake, spd_brake, reverse, camera)
 
     def get_camera(self) -> Camera:
         return Camera(
@@ -201,6 +203,16 @@ class API(object):
     def set_reverse_thrust(self, value):
         if value < 0:
             set_dref("sim/cockpit2/engine/actuators/throttle_jet_rev_ratio_all", value)
+
+    def get_speedbrake(self) -> float:
+        return get_dref("sim/cockpit2/controls/speedbrake_ratio")[0]
+
+    def set_speedbrake(self, value):
+        """
+        value: how much speedbrake is deployed [0, 1]
+        """
+        if value >= 0:
+            set_dref("sim/cockpit2/controls/speedbrake_ratio", value)
     
     def get_brake(self) -> float:
         return get_dref("sim/cockpit2/controls/parking_brake_ratio")[0]
