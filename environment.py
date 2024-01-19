@@ -34,6 +34,7 @@ class XplaneEnvironment:
                 break
             except:
                 time.sleep(0.1)
+        self.api.init_ctrl() 
         state = self.getState()
 
         return state

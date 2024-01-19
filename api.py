@@ -154,6 +154,27 @@ class API(object):
                    heading,                # aircraft heading true
                    speed)                  # speed meters per second
         self.socket.sendto(msg, (self.beacon['ip'], self.beacon['port']))
+
+    def init_ctrl(self):
+        init_ctrl = Controls(
+            elev = 0,
+            ail = 0,
+            rud = 0,
+            thr = 0.5,
+            gear = 0,
+            flaps = 0,
+            trim = 0,
+            brake = 0,
+            spd_brake = 0,
+            reverse = 0,
+            camera = Camera(0, 0, -10, 0, 0, 0) 
+        )
+        self.send_ctrl(init_ctrl)
+        set_dref("sim/cockpit2/switches/landing_lights_on", 1.0)
+        set_dref("sim/cockpit2/switches/navigation_lights_on", 1.0)
+        set_dref("sim/cockpit2/switches/strobe_lights_on", 1.0)
+        set_dref("sim/cockpit2/switches/taxi_light_on", 1.0)
+        set_dref("sim/cockpit2/switches/landing_lights_switch", [1.0 for _ in range(16)])
     
     def send_ctrl(self, controls: Controls):
         with xpc.XPlaneConnect() as client:

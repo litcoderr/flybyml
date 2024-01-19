@@ -2,6 +2,7 @@ from typing import Optional
 
 import os
 import time
+import json
 import random
 import numpy as np
 from queue import Queue
@@ -36,6 +37,26 @@ class Config:
     init_zulu_time: float = 0 # GMT time. seconds since midnight
     weather: Optional[Weather] = None
 
+
+def save_meta_data(root_dir, name):
+    meta_path = Path(root_dir) / f"{name}.json"
+    meta = {
+        "init_zulu_time": Config.init_zulu_time,
+        "weather": Config.weather.serialize()
+    }
+    with open(meta_path, "w") as f:
+        json.dump(meta, f)
+
+
+def take_screen_shot(root_dir, name):
+    img_path = Path(root_dir) / f"{name}.jpg"
+    window = pw.getWindowsWithTitle("X-System")
+    x, y, width, height = window[0].left, window[0].top, window[0].width, window[0].height
+    screenshot = pyautogui.screenshot(region=(x, y, width, height))
+    # TODO maybe resize to make image smaller
+    screenshot.save(img_path)
+
+
 class HumanAgent(AgentInterface):
     def __init__(self, aircraft: Aircraft):
         super().__init__(aircraft)
@@ -66,7 +87,7 @@ def sample_weather(apt_elev: float) -> Weather:
     cloud_base_msl = apt_elev + random.uniform(ft_to_me(1000), ft_to_me(4000))
     cloud_top_msl = random.uniform(cloud_base_msl + ft_to_me(5000), cloud_base_msl + ft_to_me(8000))
     cloud_coverage = random.uniform(0, 1)
-    cloud_type = np.random.choice(np.arange(0, 4), p=[0.3, 0.3, 0.3, 0.1])
+    cloud_type = float(np.random.choice(np.arange(0, 4), p=[0.3, 0.3, 0.3, 0.1]))
 
     # sample precipitation
     precipitation = random.uniform(0, 1)
@@ -82,12 +103,12 @@ def sample_weather(apt_elev: float) -> Weather:
     wind_msl = random.uniform(apt_elev + ft_to_me(50), cloud_top_msl)
     wind_direction = random.uniform(0, 360)
     wind_speed = random.uniform(0, kts_to_mps(16))
-    wind_turbulence = np.random.choice(np.arange(0, 1, 0.2), p=[0.3,0.4,0.2,0.05,0.05])
+    wind_turbulence = float(np.random.choice(np.arange(0, 1, 0.2), p=[0.3,0.4,0.2,0.05,0.05]))
     wind_shear_direction = random.uniform(wind_direction-10, wind_direction+10)
     if wind_shear_direction < 0:
         wind_shear_direction += 360
     wind_shear_direction %= 360
-    wind_shear_max_speed = np.random.choice(np.arange(0,20,2), p=[0.5,0.2,0.2,0.03,0.02,0.01,0.01,0.01,0.01,0.01])
+    wind_shear_max_speed = float(np.random.choice(np.arange(0,20,2), p=[0.5,0.2,0.2,0.03,0.02,0.01,0.01,0.01,0.01,0.01]))
 
     weather = Weather(
         change_mode = ChangeMode(random.randint(0, 6)),
@@ -110,21 +131,15 @@ def sample_weather(apt_elev: float) -> Weather:
     )
     return weather
 
-def take_screen_shot(root_dir, name):
-    img_path = Path(root_dir) / f"{name}.jpg"  # TODO use jpg for smaller size
-    window = pw.getWindowsWithTitle("X-System")
-    x, y, width, height = window[0].left, window[0].top, window[0].width, window[0].height
-    screenshot = pyautogui.screenshot(region=(x, y, width, height))
-    # TODO maybe resize to make image smaller
-    screenshot.save(img_path)
-
 if __name__ == "__main__":
     DATASET_ROOT = Path('D:\\dataset\\flybyml_dataset')
     IMG_ROOT = DATASET_ROOT / "image"
-    METADATA_ROOT = DATASET_ROOT / "metadata"
+    METADATA_ROOT = DATASET_ROOT / "meta"
+    CONTROL_ROOT = DATASET_ROOT / "control"
     os.makedirs(DATASET_ROOT, exist_ok=True)
     os.makedirs(IMG_ROOT, exist_ok=True)
     os.makedirs(METADATA_ROOT, exist_ok=True)
+    os.makedirs(CONTROL_ROOT, exist_ok=True)
 
     # set up human agent and environment
     human = HumanAgent(Config.aircraft)
@@ -133,8 +148,8 @@ if __name__ == "__main__":
 
     while True:
         session_id = str(uuid.uuid4())
-        session_dir = IMG_ROOT / session_id
-        os.makedirs(session_dir, exist_ok=True)
+        img_dir = IMG_ROOT / session_id
+        os.makedirs(img_dir, exist_ok=True)
 
         # randomize configuration
         target_rwy, init_lat, init_lon = sample_tgt_rwy_and_position()
@@ -143,6 +158,7 @@ if __name__ == "__main__":
         Config.init_pos.alt = random.uniform(target_rwy.elev+ft_to_me(4000), target_rwy.elev+ft_to_me(5000))
         Config.init_zulu_time = sample_zulu_time()
         Config.weather = sample_weather(target_rwy.elev)
+        save_meta_data(METADATA_ROOT, session_id)
 
         state = env.reset(
             lat = Config.init_pos.lat,
@@ -171,7 +187,7 @@ if __name__ == "__main__":
         step_id = 0
         while True:
             state, controls, abs_time = env.step()
-            take_screen_shot(session_dir, str(step_id).zfill(5))
+            take_screen_shot(img_dir, str(step_id).zfill(5))
             # TODO write data
 
             # send atc plane's state

@@ -7,6 +7,7 @@ from airport import Runway
 class StarterGui(Tk):
     def __init__(self, api: API, runway: Runway):
         super().__init__()
+        self.title = "Start Data Collection"
         self.api = api
         
         self.airport = Label(self, text=f'airport: {runway.apt_id}', width=100, anchor='w')

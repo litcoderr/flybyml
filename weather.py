@@ -1,4 +1,4 @@
-from typing import List
+from typing import List, Dict, Any
 
 
 class WeatherProperty:
@@ -187,3 +187,9 @@ class Weather:
         self.wind_turbulence = wind_turbulence
         self.wind_shear_direction = wind_shear_direction
         self.wind_shear_max_speed = wind_shear_max_speed
+    
+    def serialize(self) -> Dict[str, Any]:
+        data = {}
+        for key, obj in self.__dict__.items():
+            data[key] = obj.value
+        return data
