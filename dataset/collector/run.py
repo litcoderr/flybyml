@@ -5,11 +5,12 @@ import time
 import json
 import random
 import numpy as np
-from queue import Queue
-from pathlib import Path
 import pygetwindow as pw
 import pyautogui
 import uuid
+from queue import Queue
+from pathlib import Path
+from PIL.Image import Image
 
 from util import ft_to_me, haversine_distance_and_bearing, kts_to_mps
 from aircraft import Aircraft
@@ -48,13 +49,11 @@ def save_meta_data(root_dir, name):
         json.dump(meta, f)
 
 
-def take_screen_shot(root_dir, name):
-    img_path = Path(root_dir) / f"{name}.jpg"
+def get_screen() -> Image:
     window = pw.getWindowsWithTitle("X-System")
     x, y, width, height = window[0].left, window[0].top, window[0].width, window[0].height
     screenshot = pyautogui.screenshot(region=(x, y, width, height))
-    # TODO maybe resize to make image smaller
-    screenshot.save(img_path)
+    return screenshot
 
 
 class HumanAgent(AgentInterface):
@@ -102,7 +101,7 @@ def sample_weather(apt_elev: float) -> Weather:
 
     wind_msl = random.uniform(apt_elev + ft_to_me(50), cloud_top_msl)
     wind_direction = random.uniform(0, 360)
-    wind_speed = random.uniform(0, kts_to_mps(16))
+    wind_speed = float(np.random.choice(np.arange(0, 10, 1), p=[0.2,0.2,0.3,0.2,0.02,0.02,0.02,0.02,0.01,0.01]))
     wind_turbulence = float(np.random.choice(np.arange(0, 1, 0.2), p=[0.3,0.4,0.2,0.05,0.05]))
     wind_shear_direction = random.uniform(wind_direction-10, wind_direction+10)
     if wind_shear_direction < 0:
@@ -135,11 +134,11 @@ if __name__ == "__main__":
     DATASET_ROOT = Path('D:\\dataset\\flybyml_dataset')
     IMG_ROOT = DATASET_ROOT / "image"
     METADATA_ROOT = DATASET_ROOT / "meta"
-    CONTROL_ROOT = DATASET_ROOT / "control"
+    DATA_ROOT = DATASET_ROOT / "data"
     os.makedirs(DATASET_ROOT, exist_ok=True)
     os.makedirs(IMG_ROOT, exist_ok=True)
     os.makedirs(METADATA_ROOT, exist_ok=True)
-    os.makedirs(CONTROL_ROOT, exist_ok=True)
+    os.makedirs(DATA_ROOT, exist_ok=True)
 
     # set up human agent and environment
     human = HumanAgent(Config.aircraft)
@@ -148,6 +147,7 @@ if __name__ == "__main__":
 
     while True:
         session_id = str(uuid.uuid4())
+        print(f"starting {session_id}")
         img_dir = IMG_ROOT / session_id
         os.makedirs(img_dir, exist_ok=True)
 
@@ -183,12 +183,27 @@ if __name__ == "__main__":
         atc.start()
 
         # run simulation until end of session
-        prev_state: Optional[PlaneState] = None
+        prev_state: PlaneState = env.getState()
+        prev_image: Optional[Image] = get_screen()
+        buffer = []
+        start_time = time.time()
         step_id = 0
         while True:
+            # save previous image
+            img_path = img_dir / f"{str(step_id).zfill(5)}.jpg"
+            prev_image.save(img_path)
+
+            # get state and control inputs
             state, controls, abs_time = env.step()
-            take_screen_shot(img_dir, str(step_id).zfill(5))
-            # TODO write data
+            # update previous image
+            prev_image = get_screen()
+
+            # save data to buffer
+            buffer.append({
+                'state': prev_state.serialize(),
+                'control': controls.serialize(),
+                'rel_time': abs_time - start_time
+            })
 
             # send atc plane's state
             queue.put({"timestamp": time.time(), "is_running": True, "state": state})
@@ -199,8 +214,16 @@ if __name__ == "__main__":
                                                          state.pos.lat, state.pos.lon, 0)
                 if dist < 0.5:
                     break
+
             prev_state = state
             step_id += 1
+
+        # save buffer
+        data_path = DATA_ROOT / f"{session_id}.json"
+        with open(data_path, "w") as f:
+            json.dump(buffer, f)
+        
+        print(f"saved {session_id}")
 
         queue.put({"timestamp": time.time(), "is_running": False})
         atc.join()

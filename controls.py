@@ -40,3 +40,18 @@ class Controls:
     
     def to_api_compatible(self) -> List[float]:
         return [float(self.elev), float(self.ail), float(self.rud), float(self.thr), float(self.gear), float(self.flaps)]
+    
+    def serialize(self):
+        return {
+            "elevator": self.elev,
+            "aileron": self.ail,
+            "rudder": self.rud,
+            "thrust": self.thr,
+            "gear": self.gear,
+            "flaps": self.flaps,
+            "trim": self.trim,
+            "brake": self.brake,
+            "speed_brake": self.spd_brake,
+            "reverse_thrust": self.reverse,
+            "camera": [self.camera.x, self.camera.y, self.camera.z, self.camera.heading, self.camera.pitch, self.camera.roll]
+        }
