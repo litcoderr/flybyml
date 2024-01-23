@@ -184,23 +184,21 @@ if __name__ == "__main__":
 
         # run simulation until end of session
         prev_state: PlaneState = env.getState()
-        prev_image: Optional[Image] = get_screen()
         buffer = []
         start_time = time.time()
         step_id = 0
         while True:
             # save previous image
             img_path = img_dir / f"{str(step_id).zfill(5)}.jpg"
-            prev_image.save(img_path)
 
             # get state and control inputs
+            screen = get_screen()
             state, controls, abs_time = env.step()
-            # update previous image
-            prev_image = get_screen()
+            screen.save(img_path)
 
             # save data to buffer
             buffer.append({
-                'state': prev_state.serialize(),
+                'state': state.serialize(),
                 'control': controls.serialize(),
                 'rel_time': abs_time - start_time
             })
@@ -227,3 +225,4 @@ if __name__ == "__main__":
 
         queue.put({"timestamp": time.time(), "is_running": False})
         atc.join()
+        break

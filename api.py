@@ -254,14 +254,14 @@ class API(object):
         """
         returns in m/s
         """
-        return get_dref('sim/flightmodel/position/indicated_airspeed')[0] * 1.94384
+        return get_dref('sim/flightmodel/position/indicated_airspeed')[0] * 0.514444
     
     def get_vertical_speed(self):
         """
         returns in m/s
         """
         fpm = get_dref('sim/cockpit2/tcas/targets/position/vertical_speed')[0]
-        mps = fpm * (0.3048 / 60)
+        mps = fpm * 0.00508
         return mps
     
     def set_zulu_time(self, zulu_time: float):
