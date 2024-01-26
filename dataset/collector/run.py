@@ -11,6 +11,7 @@ import uuid
 from queue import Queue
 from pathlib import Path
 from PIL.Image import Image
+from enum import Enum
 
 from util import ft_to_me, haversine_distance_and_bearing, kts_to_mps
 from aircraft import Aircraft
@@ -28,6 +29,12 @@ from weather import Weather, ChangeMode, \
     WindMsl, WindDirection, WindSpeed, WindTurbulence, WindShearDirection, WindShearMaxSpeed
 from dataset.collector.atc import ATC
 from dataset.collector.gui import StarterGui
+
+
+class SessionState(Enum):
+    Approaching = 1
+    NearRunway = 2
+    Abort = 3
 
 
 class Config:
@@ -147,6 +154,7 @@ if __name__ == "__main__":
 
     while True:
         session_id = str(uuid.uuid4())
+        session_state = SessionState.Approaching
         print(f"starting {session_id}")
         img_dir = IMG_ROOT / session_id
         os.makedirs(img_dir, exist_ok=True)
@@ -158,7 +166,6 @@ if __name__ == "__main__":
         Config.init_pos.alt = random.uniform(target_rwy.elev+ft_to_me(4000), target_rwy.elev+ft_to_me(5000))
         Config.init_zulu_time = sample_zulu_time()
         Config.weather = sample_weather(target_rwy.elev)
-        save_meta_data(METADATA_ROOT, session_id)
 
         state = env.reset(
             lat = Config.init_pos.lat,
@@ -213,6 +220,13 @@ if __name__ == "__main__":
                 if dist < 0.5:
                     break
 
+                runway_dist, _ = haversine_distance_and_bearing(target_rwy.lat, target_rwy.lon, 0, state.pos.lat, state.pos.lon, 0)
+                if session_state == SessionState.Approaching and runway_dist < 50:
+                    session_state = SessionState.NearRunway
+                if session_state == SessionState.NearRunway and runway_dist > 2000:
+                    session_state = SessionState.Abort
+                    break
+
             prev_state = state
             step_id += 1
 
@@ -220,9 +234,9 @@ if __name__ == "__main__":
         data_path = DATA_ROOT / f"{session_id}.json"
         with open(data_path, "w") as f:
             json.dump(buffer, f)
+        save_meta_data(METADATA_ROOT, session_id)
         
         print(f"saved {session_id}")
 
         queue.put({"timestamp": time.time(), "is_running": False})
         atc.join()
-        break
