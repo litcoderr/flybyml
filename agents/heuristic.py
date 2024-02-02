@@ -4,7 +4,7 @@ from tkinter import Tk, Label, Entry, Button, Frame
 from threading import Thread
 
 from environment import XplaneEnvironment
-from agent import AgentInterface
+from agents import AgentInterface
 from state.state import PlaneState
 from controls import Controls
 from aircraft.c172sp import C172SP

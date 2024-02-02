@@ -19,7 +19,7 @@ from aircraft.b738 import B738
 from state.pos import Position
 from state.state import PlaneState
 from controls import Controls
-from agent import AgentInterface
+from agents import AgentInterface
 from airport import sample_tgt_rwy_and_position
 from api import API
 from environment import XplaneEnvironment

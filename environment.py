@@ -2,7 +2,7 @@ from typing import Tuple
 
 import time
 
-from agent import AgentInterface
+from agents import AgentInterface
 from api import API
 from state.state import PlaneState
 from controls import Controls
