@@ -1,9 +1,14 @@
+import torch
 import os
 import math
 import json
 import random
-from torch.utils.data import Dataset
+
+from PIL import Image
 from pathlib import Path
+from torch.utils.data import Dataset
+from torchvision.transforms import ToTensor, Resize, CenterCrop
+
 
 
 class DatasetType:
@@ -43,16 +48,40 @@ class BaselineDataset(Dataset):
         self.root = root
         self.dataset_type = dataset_type
 
-        # get split data
+        # load split
         split_path = self.root / "split" / f"{self.dataset_type}.json"
         with open(split_path, "r") as f:
+            # self.split ex) ['session_id_0', 'session_id_1, ...]
             self.split = json.load(f)
 
     def __len__(self):
-        # TODO
-        return 0
+        return len(self.split)
     
     def __getitem__(self, idx):
+        # load image
+        to_tensor = ToTensor()
+        resize = Resize(size=256)
+        center_crop = CenterCrop(size=224)
+
+        img_root = self.root / "image" / self.split[idx]
+        imgs = []
+        for img_name in os.listdir(img_root):
+            img = to_tensor(Image.open(img_root / img_name))
+            resized_img = resize(img)
+            cropped_img = center_crop(resized_img)
+            imgs.append(cropped_img)
+        imgs = torch.stack(imgs, dim=0)
+
+        # read meta data
+        with open(self.root / "meta" / f"{self.split[idx]}.json", "r") as f:
+            meta = json.load(f)
+
+        # read flight data
+        with open(self.root / "data" / f"{self.split[idx]}.json", "r") as f:
+            data = json.load(f)
+
+        for datum in data:
+            pass
         # TODO
         return None
 
@@ -65,3 +94,5 @@ if __name__ == "__main__":
         root = root_path,
         dataset_type = DatasetType.TRAIN
     )
+
+    data = train_dataset[0]
