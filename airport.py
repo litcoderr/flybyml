@@ -17,6 +17,16 @@ class Runway:
         self.bearing = bearing
         self.width = width
         self.length = length
+    
+    def serialize(self):
+        return {
+            "apt_id": self.apt_id,
+            "rwy_id": self.rwy_id,
+            "position": [self.lat, self.lon, self.elev],
+            "attitude": [0, 0, self.bearing],
+            "width": self.width,
+            "length": self.length
+        }
 
 # filter landable runway
 landable_rwy: List[Runway] = []
