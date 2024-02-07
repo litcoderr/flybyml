@@ -32,7 +32,8 @@ class XplaneEnvironment:
                 self.api.set_zulu_time(zulu_time)
                 self.api.set_weather(weather)
                 break
-            except:
+            except Exception as e:
+                print(e)
                 time.sleep(0.1)
         self.api.init_ctrl() 
         state = self.getState()

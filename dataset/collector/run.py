@@ -140,7 +140,7 @@ def sample_weather(apt_elev: float) -> Weather:
     return weather
 
 if __name__ == "__main__":
-    DATASET_ROOT = Path('D:\\dataset\\flybyml_dataset')
+    DATASET_ROOT = Path('D:\\dataset\\flybyml_dataset_v2')
     IMG_ROOT = DATASET_ROOT / "image"
     METADATA_ROOT = DATASET_ROOT / "meta"
     DATA_ROOT = DATASET_ROOT / "data"
