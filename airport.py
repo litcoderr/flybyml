@@ -17,6 +17,16 @@ class Runway:
         self.bearing = bearing
         self.width = width
         self.length = length
+    
+    def serialize(self):
+        return {
+            "apt_id": self.apt_id,
+            "rwy_id": self.rwy_id,
+            "position": [self.lat, self.lon, self.elev],
+            "attitude": [0, 0, self.bearing],
+            "width": self.width,
+            "length": self.length
+        }
 
 # filter landable runway
 landable_rwy: List[Runway] = []
@@ -30,7 +40,7 @@ def sample_tgt_rwy_and_position(radius: float = 25000) -> Tuple[Runway, float, f
     radius: radius of a circular region to randomly pick from (meters)
     """
     if len(landable_rwy) == 0:
-        APT_DAT_PATH = Path("C:\\Program Files (x85)\\Steam\\steamapps\\common\\X-Plane 12\\Global Scenery\\Global Airports\\Earth nav data\\apt.dat")
+        APT_DAT_PATH = Path("C:\\Program Files (x86)\\Steam\\steamapps\\common\\X-Plane 12\\Global Scenery\\Global Airports\\Earth nav data\\apt.dat")
         # read all apt data
         print("reading airports meta data ...")
         apts = AptDat(APT_DAT_PATH)

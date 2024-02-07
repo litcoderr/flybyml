@@ -104,7 +104,7 @@ class Stage:
         self.final = self.calc_final()
         self.base = self.calc_base()
 
-        self.vicinity_threshold = 1000  # radius in meters to determine acquired
+        self.vicinity_threshold = 1500  # radius in meters to determine acquired
         self.alert_period = 10  # alert period of command in seconds
         self.command = None
     

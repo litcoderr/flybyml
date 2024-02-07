@@ -20,7 +20,7 @@ from state.pos import Position
 from state.state import PlaneState
 from controls import Controls
 from agents import AgentInterface
-from airport import sample_tgt_rwy_and_position
+from airport import sample_tgt_rwy_and_position, Runway
 from api import API
 from environment import XplaneEnvironment
 from weather import Weather, ChangeMode, \
@@ -44,13 +44,15 @@ class Config:
     init_speed: float = 128 # m/s
     init_zulu_time: float = 0 # GMT time. seconds since midnight
     weather: Optional[Weather] = None
+    tgt_rwy: Optional[Runway] = None
 
 
 def save_meta_data(root_dir, name):
     meta_path = Path(root_dir) / f"{name}.json"
     meta = {
         "init_zulu_time": Config.init_zulu_time,
-        "weather": Config.weather.serialize()
+        "weather": Config.weather.serialize(),
+        "target_rwy": Config.tgt_rwy.serialize()
     }
     with open(meta_path, "w") as f:
         json.dump(meta, f)
@@ -90,10 +92,10 @@ def sample_weather(apt_elev: float) -> Weather:
     returns sampled Weather object
     """
     # sample cloud
-    cloud_base_msl = apt_elev + random.uniform(ft_to_me(1000), ft_to_me(4000))
+    cloud_base_msl = apt_elev + random.uniform(ft_to_me(1500), ft_to_me(4000))
     cloud_top_msl = random.uniform(cloud_base_msl + ft_to_me(5000), cloud_base_msl + ft_to_me(8000))
     cloud_coverage = random.uniform(0, 1)
-    cloud_type = float(np.random.choice(np.arange(0, 4), p=[0.3, 0.3, 0.3, 0.1]))
+    cloud_type = float(np.random.choice(np.arange(0, 4), p=[0.4, 0.4, 0.2, 0.0]))
 
     # sample precipitation
     precipitation = random.uniform(0, 1)
@@ -108,13 +110,13 @@ def sample_weather(apt_elev: float) -> Weather:
 
     wind_msl = random.uniform(apt_elev + ft_to_me(50), cloud_top_msl)
     wind_direction = random.uniform(0, 360)
-    wind_speed = float(np.random.choice(np.arange(0, 10, 1), p=[0.2,0.2,0.3,0.2,0.02,0.02,0.02,0.02,0.01,0.01]))
-    wind_turbulence = float(np.random.choice(np.arange(0, 1, 0.2), p=[0.3,0.4,0.2,0.05,0.05]))
-    wind_shear_direction = random.uniform(wind_direction-10, wind_direction+10)
+    wind_speed = float(np.random.choice(np.arange(0, 10, 2), p=[0.4, 0.4, 0.2, 0, 0]))
+    wind_turbulence = float(np.random.choice(np.arange(0, 1, 0.2), p=[0.6, 0.35, 0.05, 0, 0]))
+    wind_shear_direction = random.uniform(wind_direction-5, wind_direction+5)
     if wind_shear_direction < 0:
         wind_shear_direction += 360
     wind_shear_direction %= 360
-    wind_shear_max_speed = float(np.random.choice(np.arange(0,20,2), p=[0.5,0.2,0.2,0.03,0.02,0.01,0.01,0.01,0.01,0.01]))
+    wind_shear_max_speed = float(np.random.choice(np.arange(0,10,2), p=[0.5, 0.3, 0.15, 0.05, 0]))
 
     weather = Weather(
         change_mode = ChangeMode(random.randint(0, 6)),
@@ -138,7 +140,7 @@ def sample_weather(apt_elev: float) -> Weather:
     return weather
 
 if __name__ == "__main__":
-    DATASET_ROOT = Path('D:\\dataset\\flybyml_dataset')
+    DATASET_ROOT = Path('D:\\dataset\\flybyml_dataset_v2')
     IMG_ROOT = DATASET_ROOT / "image"
     METADATA_ROOT = DATASET_ROOT / "meta"
     DATA_ROOT = DATASET_ROOT / "data"
@@ -166,6 +168,7 @@ if __name__ == "__main__":
         Config.init_pos.alt = random.uniform(target_rwy.elev+ft_to_me(4000), target_rwy.elev+ft_to_me(5000))
         Config.init_zulu_time = sample_zulu_time()
         Config.weather = sample_weather(target_rwy.elev)
+        Config.tgt_rwy = target_rwy
 
         state = env.reset(
             lat = Config.init_pos.lat,
