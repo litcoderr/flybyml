@@ -116,7 +116,7 @@ def sample_weather(apt_elev: float) -> Weather:
     if wind_shear_direction < 0:
         wind_shear_direction += 360
     wind_shear_direction %= 360
-    wind_shear_max_speed = float(np.random.choice(np.arange(0,10,2), p=[0.5, 0.3, 0.15, 0.05, 0]))
+    wind_shear_max_speed = float(np.random.choice(np.arange(0,5,1), p=[0.5, 0.3, 0.15, 0.05, 0]))
 
     weather = Weather(
         change_mode = ChangeMode(random.randint(0, 6)),
