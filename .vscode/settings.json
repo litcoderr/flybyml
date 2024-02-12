@@ -1,3 +1,4 @@
 {
-    "cmake.sourceDirectory": "/home/litcoderr/project/flybyml/XPlaneConnect/xpcPlugin"
+    "cmake.sourceDirectory": "/home/litcoderr/project/flybyml/XPlaneConnect/xpcPlugin",
+    "cmake.configureOnOpen": false
 }

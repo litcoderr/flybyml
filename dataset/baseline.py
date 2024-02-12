@@ -72,22 +72,62 @@ class BaselineDataset(Dataset):
             imgs.append(cropped_img)
         imgs = torch.stack(imgs, dim=0)
 
-        # read meta data
+        # read target runway data
         with open(self.root / "meta" / f"{self.split[idx]}.json", "r") as f:
             meta = json.load(f)
+            tgt_position = torch.tensor(meta['target_rwy']['position']) # runway [lat, lon, alt]
+            tgt_heading = meta['target_rwy']['attitude'][2] # runway heading
 
         # read flight data
         with open(self.root / "data" / f"{self.split[idx]}.json", "r") as f:
             data = json.load(f)
 
+        observations = []
+        instructions = []
+        actions = []
+        camera = []
         for datum in data:
-            pass
-        # TODO
-        return None
+            # construct instructions
+            relative_position = torch.tensor(datum['state']['position']) - tgt_position
+            relative_heading = datum['state']['attitude'][2] - tgt_heading
+            if relative_heading > 180:
+                relative_heading = - (360 - relative_heading)
+            elif relative_heading < -180:
+                relative_heading += 360
+            relative_heading = torch.tensor([math.radians(relative_heading)])
+            instruction = torch.concat((relative_position, relative_heading))
+            instructions.append(instruction)
+
+            # construct observations
+            observations.append(torch.tensor([*datum['state']['attitude'][:2], datum['state']['speed'], datum['state']['vertical_speed']]))
+
+            # construct actions
+            # normalize all values ranging from 0 to 1
+            actions.append(torch.tensor([
+                (datum['control']['elevator'] + 1) / 2,
+                (datum['control']['aileron'] + 1) / 2,
+                (datum['control']['rudder'] + 1) / 2,
+                datum['control']['thrust'],
+                datum['control']['gear'],
+                datum['control']['flaps'],
+                (datum['control']['trim'] + 1) / 2,
+                datum['control']['brake'],
+                datum['control']['speed_brake'],
+                datum['control']['reverse_thrust'] * -1,
+            ]))
+
+            # construct camera
+            camera.append(torch.tensor(datum['control']['camera']))
+        return {
+            'observation': torch.stack(observations, dim=0),
+            'instruction': torch.stack(instructions, dim=0),
+            'action': torch.stack(actions, dim=0),
+            'camera': torch.stack(camera, dim=0)
+        }
 
 
 if __name__ == "__main__":
-    root_path = Path("D:\\dataset\\flybyml_dataset_v1")
+    root_path = Path("/data/flybyml_dataset_v1")
     #generate_split(root_path)
 
     train_dataset = BaselineDataset(
@@ -96,3 +136,4 @@ if __name__ == "__main__":
     )
 
     data = train_dataset[0]
+    pass
