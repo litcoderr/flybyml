@@ -1,12 +1,14 @@
+from pytorch_lightning.utilities.types import TRAIN_DATALOADERS
 import torch
 import os
 import math
 import json
 import random
+import pytorch_lightning as pl
 
 from PIL import Image
 from pathlib import Path
-from torch.utils.data import Dataset
+from torch.utils.data import Dataset, DataLoader
 from torchvision.transforms import ToTensor, Resize, CenterCrop
 
 
@@ -126,14 +128,33 @@ class BaselineDataset(Dataset):
         }
 
 
+class BaselineDataModule(pl.LightningDataModule):
+    def __init__(self, root):
+        super().__init__()
+        self.root = root
+        self.batch_size = 2
+
+        self.train = BaselineDataset(self.root, DatasetType.TRAIN)
+        self.val = BaselineDataset(self.root, DatasetType.VAL)
+        self.test = BaselineDataset(self.root, DatasetType.TEST)
+    
+    def train_dataloader(self):
+        return DataLoader(self.train, batch_size=self.batch_size, shuffle=True)
+
+    def val_dataloader(self):
+        return DataLoader(self.val, batch_size=self.batch_size)
+
+    def test_dataloader(self):
+        return DataLoader(self.test, batch_size=self.batch_size)
+
+
 if __name__ == "__main__":
     root_path = Path("/data/flybyml_dataset_v1")
     #generate_split(root_path)
 
-    train_dataset = BaselineDataset(
-        root = root_path,
-        dataset_type = DatasetType.TRAIN
-    )
-
-    data = train_dataset[0]
-    pass
+    train_datamodule = BaselineDataModule(root_path)
+    train_loader = train_datamodule.train_dataloader()
+    
+    for batch in train_loader:
+        # TODO need collate function for padding varying input lengths
+        pass
