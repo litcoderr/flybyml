@@ -87,7 +87,7 @@ class BaselineDataset(Dataset):
 
 
 if __name__ == "__main__":
-    root_path = Path("D:\\dataset\\flybyml_dataset")
+    root_path = Path("D:\\dataset\\flybyml_dataset_v1")
     #generate_split(root_path)
 
     train_dataset = BaselineDataset(
