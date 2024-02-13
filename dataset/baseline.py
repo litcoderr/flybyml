@@ -55,6 +55,12 @@ class BaselineDataset(Dataset):
         with open(split_path, "r") as f:
             # self.split ex) ['session_id_0', 'session_id_1, ...]
             self.split = json.load(f)
+        
+        self.max_length = 0
+        for session_id in self.split:
+            with open(self.root / "data" / f"{session_id}.json", "r") as f:
+                data = json.load(f)
+            self.max_length = max(self.max_length, len(data))
 
     def __len__(self):
         return len(self.split)
@@ -120,11 +126,25 @@ class BaselineDataset(Dataset):
 
             # construct camera
             camera.append(torch.tensor(datum['control']['camera']))
+        
+        observations = torch.stack(observations, dim=0)
+        instructions = torch.stack(instructions, dim=0)
+        actions = torch.stack(actions, dim=0)
+        camera = torch.stack(camera, dim=0)
+        # pad if needed
+        if len(data) < self.max_length:
+            pad_length = self.max_length - len(data)
+            observations = torch.cat((observations, torch.zeros((pad_length, observations.shape[1]))), dim=0)
+            instructions = torch.cat((instructions, torch.zeros((pad_length, instructions.shape[1]))), dim=0)
+            actions = torch.cat((actions, torch.zeros((pad_length, actions.shape[1]))), dim=0)
+            camera = torch.cat((camera, torch.zeros((pad_length, camera.shape[1]))), dim=0)
+
         return {
-            'observation': torch.stack(observations, dim=0),
-            'instruction': torch.stack(instructions, dim=0),
-            'action': torch.stack(actions, dim=0),
-            'camera': torch.stack(camera, dim=0)
+            'observation': observations,
+            'instruction': instructions,
+            'action': actions,
+            'camera': camera,
+            'length': torch.tensor([len(data)])
         }
 
 
@@ -153,6 +173,7 @@ if __name__ == "__main__":
     #generate_split(root_path)
 
     train_datamodule = BaselineDataModule(root_path)
+
     train_loader = train_datamodule.train_dataloader()
     
     for batch in train_loader:
