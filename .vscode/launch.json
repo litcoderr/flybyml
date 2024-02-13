@@ -10,6 +10,13 @@
             "request": "launch",
             "module": "dataset.baseline",
             "justMyCode": true
+        },
+        {
+            "name": "train",
+            "type": "python",
+            "request": "launch",
+            "module": "experiment.train_baseline",
+            "justMyCode": true
         }
     ]
 }

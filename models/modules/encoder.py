@@ -5,7 +5,7 @@ from torchvision.models import resnet50
 
 class ResNetEncoder(nn.Module):
     def __init__(self):
-        super.__init__()
+        super().__init__()
         self.normalize = T.Normalize(
             mean=[0.485, 0.456, 0.406],
             std=[0.229, 0.224, 0.225]

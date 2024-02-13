@@ -46,7 +46,7 @@ def generate_split(root: Path):
 
 
 class BaselineDataset(Dataset):
-    def __init__(self, root: str, dataset_type: DatasetType):
+    def __init__(self, root: Path, dataset_type: DatasetType):
         self.root = root
         self.dataset_type = dataset_type
 
@@ -149,7 +149,7 @@ class BaselineDataset(Dataset):
 
 
 class BaselineDataModule(pl.LightningDataModule):
-    def __init__(self, root):
+    def __init__(self, root: Path):
         super().__init__()
         self.root = root
         self.batch_size = 2
@@ -159,13 +159,13 @@ class BaselineDataModule(pl.LightningDataModule):
         self.test = BaselineDataset(self.root, DatasetType.TEST)
     
     def train_dataloader(self):
-        return DataLoader(self.train, batch_size=self.batch_size, shuffle=True)
+        return DataLoader(self.train, batch_size=self.batch_size, shuffle=True, num_workers=63)
 
     def val_dataloader(self):
-        return DataLoader(self.val, batch_size=self.batch_size)
+        return DataLoader(self.val, batch_size=self.batch_size, num_workers=63)
 
     def test_dataloader(self):
-        return DataLoader(self.test, batch_size=self.batch_size)
+        return DataLoader(self.test, batch_size=self.batch_size, num_workers=63)
 
 
 if __name__ == "__main__":
@@ -175,7 +175,3 @@ if __name__ == "__main__":
     train_datamodule = BaselineDataModule(root_path)
 
     train_loader = train_datamodule.train_dataloader()
-    
-    for batch in train_loader:
-        # TODO need collate function for padding varying input lengths
-        pass
