@@ -4,12 +4,6 @@ from torchvision import transforms as T
 from torchvision.models import resnet50
 
 class ResNetEncoder(nn.Module):
-    '''
-    img input in resnet-50: https://pytorch.org/vision/main/models/generated/torchvision.models.resnet50.html
-    
-    Accepts PIL.Image, batched (B, C, H, W) and single (C, H, W) image torch.Tensor objects. 
-    The images are resized to resize_size=[232], followed by a central crop of crop_size=[224].
-    '''
     def __init__(self):
         super.__init__()
         self.normalize = T.Normalize(
@@ -25,6 +19,8 @@ class ResNetEncoder(nn.Module):
             if "BatchNorm" in type(module).__name__:
                 module.momentum = 0.0
         self.backbone.eval()
+
+        self.output_shape = (2048,)
 
     def forward(self, rgb_observations: torch.Tensor) -> torch.Tensor:
         # permute tensor to dimension [BATCH x CHANNEL x HEIGHT X WIDTH]
