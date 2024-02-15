@@ -20,15 +20,16 @@ class BaseNetwork(nn.Module):
             # TODO: define clip encoder
             pass
 
-        self.action_regressor = LSTMRegressor(args.dframe+args.dact+args.demb, args.hidden_size, args.num_layers, args.dropout)
+        self.action_regressor = LSTMRegressor(args.dframe+args.dsensory+args.dinst, args.hidden_size, args.num_layers, args.dropout)
         
     def forward(self, batch):
         frames = batch['visual_observations']
 
+        # [b, seq_len, 512]
         vis_feat_t = self.vis_fc(self.vis_encoder(frames))
-        # TODO need to be fixed
-        inp_t = torch.cat([vis_feat_t, prev_act_t, state_t], dim=1)
-
+        # [b, seq_len, 520]
+        inp_t = torch.cat([vis_feat_t, batch['sensory_observations'], batch['instructions']], dim=2)
+        # [b, seq_len, 16]
         out_act_t = self.action_regressor(inp_t)
         return out_act_t
         

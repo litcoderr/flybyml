@@ -36,8 +36,8 @@ if __name__ == "__main__":
     parser.add_argument("--vis_encoder", type=str, default="resnet50", help="Visual encoder choice")
     # embedding dimension
     parser.add_argument("--dframe", type=int, default=512, help="Image feature vector size")
-    parser.add_argument("--dact", type=int, default=16, help="Output action vector size")
-    parser.add_argument("--demb", type=int, default=4, help="State vector (Objective) size")
+    parser.add_argument("--dsensory", type=int, default=4, help="Output action vector size")
+    parser.add_argument("--dinst", type=int, default=4, help="State vector (Objective) size")
     # lstm hyper parameters
     parser.add_argument("--num_layers", type=int, default=2, help="Number of LSTM layers")
     parser.add_argument("--hidden_size", type=int, default=64, help="Hidden size for the LSTM")

@@ -10,15 +10,24 @@ class LSTMRegressor(nn.Module):
             hidden_size=hidden_size,
             num_layers=num_layers, 
             dropout=dropout, 
-            bidirectional=True, # Alfred
+            bidirectional=False, # Alfred uses bidirectional lstm
             batch_first=True
         )
         self.linear = nn.Linear(hidden_size, 16) # 10 controls + 6 camera args
                                                  # TODO: employ upper bound, lower bound of each factor
         
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        # out = (batch_size, seq_len, hidden_size)
+        """
+        x: [batch, seq_len, 520]
+
+        return:
+            [batch, seq_len, 16]
+        """
         out, _ = self.lstm(x)
-        y_pred = self.linear(out[:,-1])
+
+        shape = out.shape
+        out = out.reshape(-1, shape[2])
+        y_pred = self.linear(out)
+        y_pred = y_pred.reshape(shape[0], shape[1], -1)
         return y_pred
     
