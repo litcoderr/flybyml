@@ -13,10 +13,11 @@ class AlfredBaseline(pl.LightningModule):
     def __init__(self, args):
         super().__init__()
         self.model = BaseNetwork(args)
+        self.mse = nn.MSELoss()
 
-    def training_step(self, batch, batch_idx):
-        output = self.model(batch)
-        loss = nn.MSELoss()(output, target)
+    def training_step(self, batch, _):
+        action_output = self.model(batch)
+        loss = self.mse(action_output, torch.cat((batch['actions'], batch['camera_actions']), dim=2))
         return loss
 
     def configure_optimizers(self):

@@ -21,6 +21,7 @@ class BaseNetwork(nn.Module):
             pass
 
         self.action_regressor = LSTMRegressor(args.dframe+args.dsensory+args.dinst, args.hidden_size, args.num_layers, args.dropout)
+        self.sigmoid = nn.Sigmoid()
         
     def forward(self, batch):
         frames = batch['visual_observations']
@@ -31,5 +32,6 @@ class BaseNetwork(nn.Module):
         inp_t = torch.cat([vis_feat_t, batch['sensory_observations'], batch['instructions']], dim=2)
         # [b, seq_len, 16]
         out_act_t = self.action_regressor(inp_t)
-        return out_act_t
+
+        return torch.cat((self.sigmoid(out_act_t[:, :, :10]), out_act_t[:, :, 10:]), dim=2)
         
