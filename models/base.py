@@ -22,8 +22,11 @@ class BaseNetwork(nn.Module):
 
         self.action_regressor = LSTMRegressor(args.dframe+args.dact+args.demb, args.hidden_size, args.num_layers, args.dropout)
         
-    def forward(self, frame, prev_act_t, state_t):
-        vis_feat_t = self.vis_fc(self.vis_encoder(frame))
+    def forward(self, batch):
+        frames = batch['visual_observations']
+
+        vis_feat_t = self.vis_fc(self.vis_encoder(frames))
+        # TODO need to be fixed
         inp_t = torch.cat([vis_feat_t, prev_act_t, state_t], dim=1)
 
         out_act_t = self.action_regressor(inp_t)

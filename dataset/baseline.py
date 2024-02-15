@@ -155,7 +155,7 @@ class BaselineDataModule(pl.LightningDataModule):
     def __init__(self, root: Path):
         super().__init__()
         self.root = root
-        self.batch_size = 2
+        self.batch_size = 1
 
         self.train = BaselineDataset(self.root, DatasetType.TRAIN)
         self.val = BaselineDataset(self.root, DatasetType.VAL)

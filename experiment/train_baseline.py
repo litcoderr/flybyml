@@ -15,10 +15,7 @@ class AlfredBaseline(pl.LightningModule):
         self.model = BaseNetwork(args)
 
     def training_step(self, batch, batch_idx):
-        # TODO below tuple is outdated. need fix
-        image, prev_action, state, target = batch
-
-        output = self.model(image, prev_action, state)
+        output = self.model(batch)
         loss = nn.MSELoss()(output, target)
         return loss
 
