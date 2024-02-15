@@ -72,13 +72,13 @@ class BaselineDataset(Dataset):
         center_crop = CenterCrop(size=224)
 
         img_root = self.root / "image" / self.split[idx]
-        imgs = []
+        visual_observations = []
         for img_name in os.listdir(img_root):
             img = to_tensor(Image.open(img_root / img_name))
             resized_img = resize(img)
             cropped_img = center_crop(resized_img)
-            imgs.append(cropped_img)
-        imgs = torch.stack(imgs, dim=0)
+            visual_observations.append(cropped_img)
+        visual_observations = torch.stack(visual_observations, dim=0) # [seq_length, 3, 224, 224]
 
         # read target runway data
         with open(self.root / "meta" / f"{self.split[idx]}.json", "r") as f:
@@ -90,10 +90,10 @@ class BaselineDataset(Dataset):
         with open(self.root / "data" / f"{self.split[idx]}.json", "r") as f:
             data = json.load(f)
 
-        observations = []
+        sensory_observations = []
         instructions = []
         actions = []
-        camera = []
+        camera_actions = []
         for datum in data:
             # construct instructions
             relative_position = torch.tensor(datum['state']['position']) - tgt_position
@@ -107,7 +107,7 @@ class BaselineDataset(Dataset):
             instructions.append(instruction)
 
             # construct observations
-            observations.append(torch.tensor([*datum['state']['attitude'][:2], datum['state']['speed'], datum['state']['vertical_speed']]))
+            sensory_observations.append(torch.tensor([*datum['state']['attitude'][:2], datum['state']['speed'], datum['state']['vertical_speed']]))
 
             # construct actions
             # normalize all values ranging from 0 to 1
@@ -125,25 +125,28 @@ class BaselineDataset(Dataset):
             ]))
 
             # construct camera
-            camera.append(torch.tensor(datum['control']['camera']))
+            camera_actions.append(torch.tensor(datum['control']['camera']))
         
-        observations = torch.stack(observations, dim=0)
+        sensory_observations = torch.stack(sensory_observations, dim=0)
         instructions = torch.stack(instructions, dim=0)
         actions = torch.stack(actions, dim=0)
-        camera = torch.stack(camera, dim=0)
+        camera_actions = torch.stack(camera_actions, dim=0)
+
         # pad if needed
-        if len(data) < self.max_length:
-            pad_length = self.max_length - len(data)
-            observations = torch.cat((observations, torch.zeros((pad_length, observations.shape[1]))), dim=0)
+        pad_length = self.max_length - len(data)
+        if pad_length > 0:
+            visual_observations = torch.cat((visual_observations, torch.zeros((pad_length, *visual_observations.shape[1:]))), dim=0)
+            sensory_observations = torch.cat((sensory_observations, torch.zeros((pad_length, sensory_observations.shape[1]))), dim=0)
             instructions = torch.cat((instructions, torch.zeros((pad_length, instructions.shape[1]))), dim=0)
             actions = torch.cat((actions, torch.zeros((pad_length, actions.shape[1]))), dim=0)
-            camera = torch.cat((camera, torch.zeros((pad_length, camera.shape[1]))), dim=0)
+            camera_actions = torch.cat((camera_actions, torch.zeros((pad_length, camera_actions.shape[1]))), dim=0)
 
         return {
-            'observation': observations,
-            'instruction': instructions,
-            'action': actions,
-            'camera': camera,
+            'visual_observations': visual_observations,
+            'sensory_observations': sensory_observations,
+            'instructions': instructions,
+            'actions': actions,
+            'camera_actions': camera_actions,
             'length': torch.tensor([len(data)])
         }
 
@@ -175,3 +178,7 @@ if __name__ == "__main__":
     train_datamodule = BaselineDataModule(root_path)
 
     train_loader = train_datamodule.train_dataloader()
+
+    # test batch
+    for batch in train_loader:
+        break
