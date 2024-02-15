@@ -138,8 +138,7 @@ class BaselineDataset(Dataset):
             'sensory_observations': sensory_observations,
             'instructions': instructions,
             'actions': actions,
-            'camera_actions': camera_actions,
-            'length': torch.tensor([len(data)])
+            'camera_actions': camera_actions
         }
 
 
