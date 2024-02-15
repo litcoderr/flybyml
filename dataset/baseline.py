@@ -1,4 +1,3 @@
-from pytorch_lightning.utilities.types import TRAIN_DATALOADERS
 import torch
 import os
 import math
@@ -56,45 +55,31 @@ class BaselineDataset(Dataset):
             # self.split ex) ['session_id_0', 'session_id_1, ...]
             self.split = json.load(f)
         
-        self.max_length = 0
-        for session_id in self.split:
-            with open(self.root / "data" / f"{session_id}.json", "r") as f:
-                data = json.load(f)
-            self.max_length = max(self.max_length, len(data))
+        self.seq_length = 10
 
     def __len__(self):
         return len(self.split)
     
     def __getitem__(self, idx):
-        # load image
-        to_tensor = ToTensor()
-        resize = Resize(size=256)
-        center_crop = CenterCrop(size=224)
-
-        img_root = self.root / "image" / self.split[idx]
-        visual_observations = []
-        for img_name in os.listdir(img_root):
-            img = to_tensor(Image.open(img_root / img_name))
-            resized_img = resize(img)
-            cropped_img = center_crop(resized_img)
-            visual_observations.append(cropped_img)
-        visual_observations = torch.stack(visual_observations, dim=0) # [seq_length, 3, 224, 224]
-
         # read target runway data
         with open(self.root / "meta" / f"{self.split[idx]}.json", "r") as f:
             meta = json.load(f)
             tgt_position = torch.tensor(meta['target_rwy']['position']) # runway [lat, lon, alt]
             tgt_heading = meta['target_rwy']['attitude'][2] # runway heading
-
+        
         # read flight data
         with open(self.root / "data" / f"{self.split[idx]}.json", "r") as f:
             data = json.load(f)
+        
+        # sample starting index
+        total_length = len(data)
+        start_idx = random.randint(0, total_length-self.seq_length)
 
         sensory_observations = []
         instructions = []
         actions = []
         camera_actions = []
-        for datum in data:
+        for datum in data[start_idx:start_idx+self.seq_length]:
             # construct instructions
             relative_position = torch.tensor(datum['state']['position']) - tgt_position
             relative_heading = datum['state']['attitude'][2] - tgt_heading
@@ -126,20 +111,27 @@ class BaselineDataset(Dataset):
 
             # construct camera
             camera_actions.append(torch.tensor(datum['control']['camera']))
-        
+
+        # load image
+        to_tensor = ToTensor()
+        resize = Resize(size=256)
+        center_crop = CenterCrop(size=224)
+
+        img_root = self.root / "image" / self.split[idx]
+        visual_observations = []
+        img_names = os.listdir(img_root)
+        img_names.sort()
+        for img_name in img_names[start_idx:start_idx+self.seq_length]:
+            img = to_tensor(Image.open(img_root / img_name))
+            resized_img = resize(img)
+            cropped_img = center_crop(resized_img)
+            visual_observations.append(cropped_img)
+        visual_observations = torch.stack(visual_observations, dim=0) # [seq_length, 3, 224, 224]
+
         sensory_observations = torch.stack(sensory_observations, dim=0)
         instructions = torch.stack(instructions, dim=0)
         actions = torch.stack(actions, dim=0)
         camera_actions = torch.stack(camera_actions, dim=0)
-
-        # pad if needed
-        pad_length = self.max_length - len(data)
-        if pad_length > 0:
-            visual_observations = torch.cat((visual_observations, torch.zeros((pad_length, *visual_observations.shape[1:]))), dim=0)
-            sensory_observations = torch.cat((sensory_observations, torch.zeros((pad_length, sensory_observations.shape[1]))), dim=0)
-            instructions = torch.cat((instructions, torch.zeros((pad_length, instructions.shape[1]))), dim=0)
-            actions = torch.cat((actions, torch.zeros((pad_length, actions.shape[1]))), dim=0)
-            camera_actions = torch.cat((camera_actions, torch.zeros((pad_length, camera_actions.shape[1]))), dim=0)
 
         return {
             'visual_observations': visual_observations,

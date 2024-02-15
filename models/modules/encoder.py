@@ -25,13 +25,16 @@ class ResNetEncoder(nn.Module):
     def forward(self, rgb_observations: torch.Tensor) -> torch.Tensor:
         """
         rgb_observations: [batch, seq_len, channel, width, height]
+
+        return:
+            [batch, seq_len, 2048]
         """
         shape = rgb_observations.shape
 
         rgb_observations = rgb_observations.reshape(-1, *shape[2:])
         rgb_observations = torch.stack([self.normalize(rgb) for rgb in rgb_observations])
         rgb_x = self.backbone(rgb_observations).float()
-
+        rgb_x = rgb_x.reshape(shape[0], shape[1], -1)
         return rgb_x
     
 class ResNetCLIPEncoder(nn.Module):
