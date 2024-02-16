@@ -3,13 +3,12 @@ import os
 import math
 import json
 import random
-import pytorch_lightning as pl
 
 from PIL import Image
 from pathlib import Path
 from torch.utils.data import Dataset, DataLoader
 from torchvision.transforms import ToTensor, Resize, CenterCrop
-
+from lightning import LightningDataModule
 
 
 class DatasetType:
@@ -55,7 +54,7 @@ class BaselineDataset(Dataset):
             # self.split ex) ['session_id_0', 'session_id_1, ...]
             self.split = json.load(f)
         
-        self.seq_length = 10
+        self.seq_length = 30
 
     def __len__(self):
         return len(self.split)
@@ -142,11 +141,11 @@ class BaselineDataset(Dataset):
         }
 
 
-class BaselineDataModule(pl.LightningDataModule):
-    def __init__(self, root: Path):
+class BaselineDataModule(LightningDataModule):
+    def __init__(self, root: Path, batch_size):
         super().__init__()
         self.root = root
-        self.batch_size = 1
+        self.batch_size = batch_size
 
         self.train = BaselineDataset(self.root, DatasetType.TRAIN)
         self.val = BaselineDataset(self.root, DatasetType.VAL)
@@ -166,7 +165,7 @@ if __name__ == "__main__":
     root_path = Path("/data/flybyml_dataset_v1")
     #generate_split(root_path)
 
-    train_datamodule = BaselineDataModule(root_path)
+    train_datamodule = BaselineDataModule(root_path, 1)
 
     train_loader = train_datamodule.train_dataloader()
 

@@ -1,4 +1,4 @@
 tqdm
 jupyter
 tensorboard
-pytorch_lightning
+lightning

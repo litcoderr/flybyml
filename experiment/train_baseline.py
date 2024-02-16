@@ -1,15 +1,16 @@
 import argparse
 import torch
 import torch.nn as nn
-import pytorch_lightning as pl
 
 from pathlib import Path
+from lightning import LightningModule, Trainer
+from lightning.pytorch.loggers import TensorBoardLogger
 
 from models.base import BaseNetwork
 from dataset.baseline import BaselineDataModule
 
 
-class AlfredBaseline(pl.LightningModule):
+class AlfredBaseline(LightningModule):
     def __init__(self, args):
         super().__init__()
         self.model = BaseNetwork(args)
@@ -18,6 +19,15 @@ class AlfredBaseline(pl.LightningModule):
     def training_step(self, batch, _):
         action_output = self.model(batch)
         loss = self.mse(action_output, torch.cat((batch['actions'], batch['camera_actions']), dim=2))
+
+        self.log("train_loss", loss)
+        return loss
+    
+    def validation_step(self, batch, _):
+        action_output = self.model(batch)
+        loss = self.mse(action_output, torch.cat((batch['actions'], batch['camera_actions']), dim=2))
+
+        self.log("val_loss", loss)
         return loss
 
     def configure_optimizers(self):
@@ -25,9 +35,11 @@ class AlfredBaseline(pl.LightningModule):
 
 
 def main(args):
-    datamodule = BaselineDataModule(root=Path(args.dataset_root))
+    logger = TensorBoardLogger("logs", name="baseline")
+    datamodule = BaselineDataModule(root=Path(args.dataset_root), batch_size=args.bsize)
     model = AlfredBaseline(args)
-    trainer = pl.Trainer(max_epochs=args.epochs, devices=args.gpus)
+
+    trainer = Trainer(max_epochs=args.epochs, devices=args.gpus, logger=logger)
     trainer.fit(model, datamodule)
 
 
@@ -44,7 +56,8 @@ if __name__ == "__main__":
     parser.add_argument("--hidden_size", type=int, default=64, help="Hidden size for the LSTM")
     parser.add_argument("--dropout", type=float, default=0.1, help="Dropout rate for the LSTM")
     # training
-    parser.add_argument("--epochs", type=int, default=10, help="Number of training epochs")
+    parser.add_argument("--epochs", type=int, default=100000, help="Number of training epochs")
+    parser.add_argument("--bsize", type=int, default=8, help="Number of training epochs")
     parser.add_argument("--gpus", type=int, default=1, help="Number of GPUs to use for training")
     parser.add_argument("--num_workers", type=int, default=4, help="Number of DataLoader workers")
     parser.add_argument("--dataset_root", type=str, default="/data/flybyml_dataset_v1", help="root directory of flybyml dataset")
