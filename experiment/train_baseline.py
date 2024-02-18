@@ -15,16 +15,19 @@ class AlfredBaseline(LightningModule):
         super().__init__()
         self.model = BaseNetwork(args)
         self.mse = nn.MSELoss()
+    
+    def forward(self, batch, prev_context=None):
+        return self.model(batch, prev_context)
 
     def training_step(self, batch, _):
-        action_output = self.model(batch)
+        action_output, _ = self.model(batch)
         loss = self.mse(action_output, torch.cat((batch['actions'], batch['camera_actions']), dim=2))
 
         self.log("train_loss", loss)
         return loss
     
     def validation_step(self, batch, _):
-        action_output = self.model(batch)
+        action_output, _ = self.model(batch)
         loss = self.mse(action_output, torch.cat((batch['actions'], batch['camera_actions']), dim=2))
 
         self.log("val_loss", loss)

@@ -44,7 +44,7 @@ class XplaneEnvironment:
         while True:
             try:
                 current_state = self.getState()
-                controls = self.agent.sample_action(current_state)
+                controls = self.agent.sample_action(current_state, **kwargs)
                 self.api.send_ctrl(controls)
                 break
             except:

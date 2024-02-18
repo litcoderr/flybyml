@@ -17,6 +17,13 @@
             "request": "launch",
             "module": "experiment.train_baseline",
             "justMyCode": true
+        },
+        {
+            "name": "test baseline",
+            "type": "python",
+            "request": "launch",
+            "module": "experiment.test_baseline",
+            "justMyCode": true
         }
     ]
 }
