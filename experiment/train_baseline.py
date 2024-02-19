@@ -1,10 +1,13 @@
+import os
 import argparse
 import torch
 import torch.nn as nn
 
 from pathlib import Path
 from lightning import LightningModule, Trainer
-from lightning.pytorch.loggers import TensorBoardLogger
+import lightning.pytorch as pl
+from lightning.pytorch.loggers import WandbLogger
+from lightning.pytorch.callbacks import ModelCheckpoint
 
 from models.base import BaseNetwork
 from dataset.baseline import BaselineDataModule
@@ -15,6 +18,9 @@ class AlfredBaseline(LightningModule):
         super().__init__()
         self.model = BaseNetwork(args)
         self.mse = nn.MSELoss()
+
+        # auto-logged by W&B
+        self.save_hyperparameters()
     
     def forward(self, batch, prev_context=None):
         return self.model(batch, prev_context)
@@ -38,11 +44,20 @@ class AlfredBaseline(LightningModule):
 
 
 def main(args):
-    logger = TensorBoardLogger("logs", name="baseline")
+    pl.seed_everything(42)
     datamodule = BaselineDataModule(root=Path(args.dataset_root), batch_size=args.bsize)
     model = AlfredBaseline(args)
+    
+    logger = WandbLogger(project="baseline", name=args.run)
+    logger.watch(model)
+    checkpoint_callback = ModelCheckpoint(
+        every_n_epochs=args.save_epochs,
+        monitor="val_loss", 
+        dirpath=args.log_dir, 
+        filename="epoch={epoch:04d}-{val_loss:.3f}"
+    )
 
-    trainer = Trainer(max_epochs=args.epochs, devices=args.gpus, logger=logger)
+    trainer = Trainer(max_epochs=args.epochs, devices=args.gpus, logger=logger, callbacks=[checkpoint_callback], deterministic=True)
     trainer.fit(model, datamodule)
 
 
@@ -63,7 +78,12 @@ if __name__ == "__main__":
     parser.add_argument("--bsize", type=int, default=8, help="Number of training epochs")
     parser.add_argument("--gpus", type=int, default=1, help="Number of GPUs to use for training")
     parser.add_argument("--num_workers", type=int, default=4, help="Number of DataLoader workers")
-    parser.add_argument("--dataset_root", type=str, default="/data/flybyml_dataset_v1", help="root directory of flybyml dataset")
+    parser.add_argument("--dataset_root", type=str, default="/data/flybyml_dataset_v1", help="Root directory of flybyml dataset")
+    # logging
+    abs_path = os.path.dirname(__file__)
+    parser.add_argument("--log_dir", type=str, default=f"{abs_path}/logs/baseline", help="Directory for logging baseline model")
+    parser.add_argument("--run", type=str, default=f"default_alfred", help="Name of the current run")
+    parser.add_argument("--save_epochs", type=int, default=500, help="Interval epochs of model checkpoint")
 
     args = parser.parse_args()
     main(args)
