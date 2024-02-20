@@ -9,14 +9,14 @@ import lightning.pytorch as pl
 from lightning.pytorch.loggers import WandbLogger
 from lightning.pytorch.callbacks import ModelCheckpoint
 
-from models.base import BaseNetwork
+from models.base import BaseNetwork, BaseWithoutVisNetwork
 from dataset.baseline import BaselineDataModule
 
 
 class AlfredBaseline(LightningModule):
     def __init__(self, args):
         super().__init__()
-        self.model = BaseNetwork(args)
+        self.model = BaseWithoutVisNetwork(args)
         self.mse = nn.MSELoss()
 
         # auto-logged by W&B
@@ -75,8 +75,8 @@ if __name__ == "__main__":
     parser.add_argument("--dropout", type=float, default=0.1, help="Dropout rate for the LSTM")
     # training
     parser.add_argument("--epochs", type=int, default=100000, help="Number of training epochs")
-    parser.add_argument("--bsize", type=int, default=8, help="Number of training epochs")
-    parser.add_argument("--gpus", type=int, default=1, help="Number of GPUs to use for training")
+    parser.add_argument("--bsize", type=int, default=32, help="Batch size of training")
+    parser.add_argument("--gpus", type=list, default=[1], help="Number of GPUs to use for training")
     parser.add_argument("--num_workers", type=int, default=4, help="Number of DataLoader workers")
     parser.add_argument("--dataset_root", type=str, default="/data/flybyml_dataset_v1", help="Root directory of flybyml dataset")
     # logging

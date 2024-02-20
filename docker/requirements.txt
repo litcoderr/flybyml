@@ -2,3 +2,4 @@ tqdm
 jupyter
 tensorboard
 lightning
+wandb

@@ -111,21 +111,21 @@ class BaselineDataset(Dataset):
             # construct camera
             camera_actions.append(torch.tensor(datum['control']['camera']))
 
-        # load image
-        to_tensor = ToTensor()
-        resize = Resize(size=256)
-        center_crop = CenterCrop(size=224)
+        # # load image
+        # to_tensor = ToTensor()
+        # resize = Resize(size=256)
+        # center_crop = CenterCrop(size=224)
 
-        img_root = self.root / "image" / self.split[idx]
-        visual_observations = []
-        img_names = os.listdir(img_root)
-        img_names.sort()
-        for img_name in img_names[start_idx:start_idx+self.seq_length]:
-            img = to_tensor(Image.open(img_root / img_name))
-            resized_img = resize(img)
-            cropped_img = center_crop(resized_img)
-            visual_observations.append(cropped_img)
-        visual_observations = torch.stack(visual_observations, dim=0) # [seq_length, 3, 224, 224]
+        # img_root = self.root / "image" / self.split[idx]
+        # visual_observations = []
+        # img_names = os.listdir(img_root)
+        # img_names.sort()
+        # for img_name in img_names[start_idx:start_idx+self.seq_length]:
+        #     img = to_tensor(Image.open(img_root / img_name))
+        #     resized_img = resize(img)
+        #     cropped_img = center_crop(resized_img)
+        #     visual_observations.append(cropped_img)
+        # visual_observations = torch.stack(visual_observations, dim=0) # [seq_length, 3, 224, 224]
 
         sensory_observations = torch.stack(sensory_observations, dim=0)
         instructions = torch.stack(instructions, dim=0)
@@ -133,7 +133,7 @@ class BaselineDataset(Dataset):
         camera_actions = torch.stack(camera_actions, dim=0)
 
         return {
-            'visual_observations': visual_observations,
+            # 'visual_observations': visual_observations,
             'sensory_observations': sensory_observations,
             'instructions': instructions,
             'actions': actions,
