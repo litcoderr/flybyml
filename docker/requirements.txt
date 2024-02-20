@@ -3,3 +3,4 @@ jupyter
 tensorboard
 lightning
 wandb
+omegaconf

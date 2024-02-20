@@ -1,10 +1,12 @@
 from typing import Optional
 
+import sys
+from omegaconf import OmegaConf
+
 import math
 import torch
 import time
 import random
-import argparse
 import numpy as np
 import pygetwindow as pw
 import pyautogui
@@ -26,7 +28,7 @@ from weather import Weather, ChangeMode, \
     Precipitation, RunwayWetness, Temperature, \
     WindMsl, WindDirection, WindSpeed, WindTurbulence, WindShearDirection, WindShearMaxSpeed
 from dataset.collector.gui import StarterGui
-from experiment.train_baseline import AlfredBaseline
+from experiment.baseline.main_module import AlfredBaseline
 
 
 class Config:
@@ -112,7 +114,7 @@ class MLAgent(AgentInterface):
     def __init__(self, args, aircraft: Aircraft):
         super().__init__(aircraft)
         self.api: Optional[API] = None
-        self.model = AlfredBaseline.load_from_checkpoint('C:\\Users\\litco\\Desktop\\project\\flybyml\\checkpoint\\epoch=7041-step=35210.ckpt', args=args).to('cuda')
+        self.model = AlfredBaseline.load_from_checkpoint('C:\\Users\\litco\\Desktop\\project\\flybyml\\checkpoint\\epoch=7041-step=35210.ckpt', args=args.model).to('cuda')
         self.context = None
     
     def set_api(self, api: API):
@@ -193,28 +195,11 @@ class MLAgent(AgentInterface):
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="AlfredBaseline Model")
-    # module choice
-    parser.add_argument("--vis_encoder", type=str, default="resnet50", help="Visual encoder choice")
-    # embedding dimension
-    parser.add_argument("--dframe", type=int, default=512, help="Image feature vector size")
-    parser.add_argument("--dsensory", type=int, default=4, help="Output action vector size")
-    parser.add_argument("--dinst", type=int, default=4, help="State vector (Objective) size")
-    # lstm hyper parameters
-    parser.add_argument("--num_layers", type=int, default=2, help="Number of LSTM layers")
-    parser.add_argument("--hidden_size", type=int, default=64, help="Hidden size for the LSTM")
-    parser.add_argument("--dropout", type=float, default=0.1, help="Dropout rate for the LSTM")
-    # training
-    parser.add_argument("--epochs", type=int, default=100000, help="Number of training epochs")
-    parser.add_argument("--bsize", type=int, default=8, help="Number of training epochs")
-    parser.add_argument("--gpus", type=int, default=1, help="Number of GPUs to use for training")
-    parser.add_argument("--num_workers", type=int, default=4, help="Number of DataLoader workers")
-    parser.add_argument("--dataset_root", type=str, default="/data/flybyml_dataset_v1", help="root directory of flybyml dataset")
-
-    args = parser.parse_args()
-
+    conf = OmegaConf.load(sys.argv[1])
+    conf.merge_with_cli()
+    
     # set up human agent and environment
-    agent = MLAgent(args, Config.aircraft)
+    agent = MLAgent(conf, Config.aircraft)
     env = XplaneEnvironment(agent = agent)
     agent.set_api(env.api)
 
