@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 
 class LSTMRegressor(nn.Module):
-    def __init__(self, n_features, hidden_size, num_layers, dropout):
+    def __init__(self, n_features, hidden_size, out_size, num_layers, dropout):
         super().__init__()
         
         self.lstm = nn.LSTM(
@@ -13,8 +13,7 @@ class LSTMRegressor(nn.Module):
             bidirectional=False, # Alfred uses bidirectional lstm
             batch_first=True
         )
-        self.linear = nn.Linear(hidden_size, 16) # 10 controls + 6 camera args
-                                                 # TODO: employ upper bound, lower bound of each factor
+        self.linear = nn.Linear(hidden_size, out_size) # 10 controls
         
     def forward(self, x: torch.Tensor, prev_context: None) -> torch.Tensor:
         """

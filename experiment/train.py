@@ -9,16 +9,19 @@ from lightning.pytorch.loggers import WandbLogger
 from lightning.pytorch.callbacks import ModelCheckpoint
 
 from experiment.baseline.main_module import AlfredBaseline
+from experiment.baseline_without_vis.main_module import AlfredBaselineWithoutVis
 from dataset.baseline import BaselineDataModule
 
 cur_dir = Path(os.path.dirname(__file__)) 
 
 DATA_MODULE = {
-    'baseline': BaselineDataModule
+    'baseline': BaselineDataModule,
+    'baseline_without_vis': BaselineDataModule
 }
 
 PL_MODULE = {
-    'baseline': AlfredBaseline
+    'baseline': AlfredBaseline,
+    'baseline_without_vis': AlfredBaselineWithoutVis
 }
 
 

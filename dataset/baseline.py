@@ -44,7 +44,7 @@ def generate_split(root: Path):
 
 
 class BaselineDataset(Dataset):
-    def __init__(self, root: Path, dataset_type: DatasetType):
+    def __init__(self, root: Path, dataset_type: DatasetType, seq_length=30):
         self.root = root
         self.dataset_type = dataset_type
 
@@ -54,7 +54,7 @@ class BaselineDataset(Dataset):
             # self.split ex) ['session_id_0', 'session_id_1, ...]
             self.split = json.load(f)
         
-        self.seq_length = 30
+        self.seq_length = seq_length
 
     def __len__(self):
         return len(self.split)

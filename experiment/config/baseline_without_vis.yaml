@@ -1,5 +1,5 @@
-project: baseline
-run: test
+project: baseline_without_vis
+run: v1
 seed: 42
 train:
   batch_size: 32
