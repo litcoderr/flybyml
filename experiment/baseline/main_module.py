@@ -49,7 +49,7 @@ class BaseNetwork(nn.Module):
 class AlfredBaseline(LightningModule):
     def __init__(self, args):
         super().__init__()
-        self.model = BaseNetwork(args)
+        self.model = BaseNetwork(args.model)
         self.mse = nn.MSELoss()
 
         # auto-logged by W&B

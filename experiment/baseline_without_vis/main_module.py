@@ -41,7 +41,7 @@ class AlfredBaselineWithoutVis(LightningModule):
     def __init__(self, args):
         super().__init__()
         self.args = args
-        self.model = BaseWithoutVisNetwork(args)
+        self.model = BaseWithoutVisNetwork(args.model)
         self.mse = nn.MSELoss()
 
         # auto-logged by W&B
@@ -57,32 +57,35 @@ class AlfredBaselineWithoutVis(LightningModule):
         self.log("train_loss", loss)
         return loss
     
-    def validation_step(self, batch, _):
+    def validation_step(self, batch, batch_id):
         action_output, _ = self.model(batch)
         loss = self.mse(action_output, batch['actions'])
-
         self.log("val_loss", loss)
-        return loss
-    
-    def test_step(self, batch, batch_idx):
-        action_output, _ = self.forward(batch) # [1, seq_len, 16]
-        gt = batch['actions']
 
-        result_root = Path(os.path.dirname(__file__)) / "logs" / self.args.run / "result"
+        # save and upload plot
+        b_size, seq_len, _ = tuple(action_output.shape)
+        action_output = action_output.cpu().numpy()
+        gt = batch['actions'].cpu().numpy()
+
+        result_root =  Path(os.path.dirname(__file__)) / "logs" / self.args.run / "result"
         os.makedirs(result_root, exist_ok=True)
 
-        log = {}
+        image_log = {}
         keys = ['elevator', 'aileron', 'rudder', 'thrust', 'gear', 'flaps', 'trim', 'brake', 'speed_brake', 'reverse_thrust']
-        for key_idx in range(gt.shape[2]):
-            title = f'{batch_idx}_{keys[key_idx]}'
-            plt.title(title)
-            plt.plot(np.arange(0, gt.shape[1], 1), action_output.cpu().numpy()[0, :, key_idx])
-            plt.plot(np.arange(0, gt.shape[1], 1), gt.cpu().numpy()[0, :, key_idx])
-            plt.legend(['output', 'gt'])
-            plt.savefig(result_root/f'{title}.png')
-            plt.close()
-            log[title] = wandb.Image(result_root/f'{title}.png')
-        self.log(log)
+        for batch_idx in range(b_size):
+            for key_idx, key in enumerate(keys):
+                title = f'{batch_id}_{batch_idx}_{key}'
+
+                plt.plot(np.arange(0, seq_len, 1), action_output[batch_idx, :, key_idx])
+                plt.plot(np.arange(0, seq_len, 1), gt[batch_idx, :, key_idx])
+                plt.legend(['output', 'gt'])
+                plt.savefig(result_root/f'{title}.png')
+                plt.close()
+
+                image_log[title] = wandb.Image(str(result_root/f'{title}.png'))
+        wandb.log(image_log)
+
+        return loss
 
     def configure_optimizers(self):
         return torch.optim.Adam(self.parameters(), lr=1e-3)

@@ -28,7 +28,7 @@ PL_MODULE = {
 def main(args):
     pl.seed_everything(42)
     datamodule = DATA_MODULE[args.project](args)
-    model = PL_MODULE[args.project](args.model)
+    model = PL_MODULE[args.project](args)
     
     logger = WandbLogger(project=args.project, name=args.run, entity='flybyml')
     logger.watch(model)
@@ -41,7 +41,12 @@ def main(args):
         filename="{epoch:04d}-{val_loss:.3f}"
     )
 
-    trainer = Trainer(max_epochs=args.train.num_epochs, devices=args.train.gpus, logger=logger, callbacks=[checkpoint_callback], deterministic=True)
+    trainer = Trainer(max_epochs=args.train.num_epochs,
+                      devices=args.train.gpus,
+                      logger=logger,
+                      callbacks=[checkpoint_callback],
+                      deterministic=True,
+                      check_val_every_n_epoch=args.train.check_val_every_n_epoch)
     trainer.fit(model, datamodule)
 
 
