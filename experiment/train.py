@@ -45,8 +45,7 @@ def main(args):
                       devices=args.train.gpus,
                       logger=logger,
                       callbacks=[checkpoint_callback],
-                      deterministic=True,
-                      check_val_every_n_epoch=args.train.check_val_every_n_epoch)
+                      deterministic=True)
     trainer.fit(model, datamodule)
 
 

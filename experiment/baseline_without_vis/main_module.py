@@ -70,20 +70,21 @@ class AlfredBaselineWithoutVis(LightningModule):
         result_root =  Path(os.path.dirname(__file__)) / "logs" / self.args.run / "result"
         os.makedirs(result_root, exist_ok=True)
 
-        image_log = {}
-        keys = ['elevator', 'aileron', 'rudder', 'thrust', 'gear', 'flaps', 'trim', 'brake', 'speed_brake', 'reverse_thrust']
-        for batch_idx in range(b_size):
-            for key_idx, key in enumerate(keys):
-                title = f'{batch_id}_{batch_idx}_{key}'
+        if self.current_epoch % self.args.train.plot_every_epochs == 0:
+            image_log = {}
+            keys = ['elevator', 'aileron', 'rudder', 'thrust', 'gear', 'flaps', 'trim', 'brake', 'speed_brake', 'reverse_thrust']
+            for batch_idx in range(b_size):
+                for key_idx, key in enumerate(keys):
+                    title = f'{batch_id}_{batch_idx}_{key}'
 
-                plt.plot(np.arange(0, seq_len, 1), action_output[batch_idx, :, key_idx])
-                plt.plot(np.arange(0, seq_len, 1), gt[batch_idx, :, key_idx])
-                plt.legend(['output', 'gt'])
-                plt.savefig(result_root/f'{title}.png')
-                plt.close()
+                    plt.plot(np.arange(0, seq_len, 1), action_output[batch_idx, :, key_idx])
+                    plt.plot(np.arange(0, seq_len, 1), gt[batch_idx, :, key_idx])
+                    plt.legend(['output', 'gt'])
+                    plt.savefig(result_root/f'{title}.png')
+                    plt.close()
 
-                image_log[title] = wandb.Image(str(result_root/f'{title}.png'))
-        wandb.log(image_log)
+                    image_log[title] = wandb.Image(str(result_root/f'{title}.png'))
+            wandb.log(image_log)
 
         return loss
 
