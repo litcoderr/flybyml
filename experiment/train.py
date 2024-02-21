@@ -11,15 +11,26 @@ from lightning.pytorch.callbacks import ModelCheckpoint
 from experiment.baseline.main_module import AlfredBaseline
 from dataset.baseline import BaselineDataModule
 
+cur_dir = Path(os.path.dirname(__file__)) 
+
+DATA_MODULE = {
+    'baseline': BaselineDataModule
+}
+
+PL_MODULE = {
+    'baseline': AlfredBaseline
+}
+
+
 def main(args):
     pl.seed_everything(42)
-    datamodule = BaselineDataModule(root=Path(f"/data/{args.dataset.name}"), batch_size=args.train.batch_size)
-    model = AlfredBaseline(args.model)
+    datamodule = DATA_MODULE[args.project](args)
+    model = PL_MODULE[args.project](args.model)
     
-    logger = WandbLogger(project=args.project, name=args.run)
+    logger = WandbLogger(project=args.project, name=args.run, entity='flybyml')
     logger.watch(model)
     
-    ckpt_path = os.path.join(os.path.dirname(__file__), args.project, "logs", args.run)
+    ckpt_path = cur_dir / args.project / "logs" / args.run
     checkpoint_callback = ModelCheckpoint(
         every_n_epochs=args.train.save_epochs,
         monitor="val_loss", 
@@ -32,7 +43,8 @@ def main(args):
 
 
 if __name__ == "__main__":
-    conf = OmegaConf.load(sys.argv[1])
+    config_name = sys.argv[1]
+    conf = OmegaConf.load(cur_dir / "config"/ f"{config_name}.yaml")
     conf.merge_with_cli()
 
     main(conf)

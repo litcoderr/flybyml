@@ -142,33 +142,19 @@ class BaselineDataset(Dataset):
 
 
 class BaselineDataModule(LightningDataModule):
-    def __init__(self, root: Path, batch_size):
+    def __init__(self, args):
         super().__init__()
-        self.root = root
-        self.batch_size = batch_size
+        self.args = args
 
-        self.train = BaselineDataset(self.root, DatasetType.TRAIN)
-        self.val = BaselineDataset(self.root, DatasetType.VAL)
-        self.test = BaselineDataset(self.root, DatasetType.TEST)
+        self.train = BaselineDataset(Path(args.dataset.root), DatasetType.TRAIN)
+        self.val = BaselineDataset(Path(args.dataset.root), DatasetType.VAL)
+        self.test = BaselineDataset(Path(args.dataset.root), DatasetType.TEST)
     
     def train_dataloader(self):
-        return DataLoader(self.train, batch_size=self.batch_size, shuffle=True, num_workers=63)
+        return DataLoader(self.train, batch_size=self.args.train.batch_size, shuffle=True, num_workers=self.args.train.num_workers)
 
     def val_dataloader(self):
-        return DataLoader(self.val, batch_size=self.batch_size, num_workers=63)
+        return DataLoader(self.val, batch_size=self.args.test.batch_size, num_workers=self.args.test.num_workers)
 
     def test_dataloader(self):
-        return DataLoader(self.test, batch_size=self.batch_size, num_workers=63)
-
-
-if __name__ == "__main__":
-    root_path = Path("/data/flybyml_dataset_v1")
-    #generate_split(root_path)
-
-    train_datamodule = BaselineDataModule(root_path, 1)
-
-    train_loader = train_datamodule.train_dataloader()
-
-    # test batch
-    for batch in train_loader:
-        break
+        return DataLoader(self.test, batch_size=self.args.test.batch_size, num_workers=self.args.test.num_workers)
