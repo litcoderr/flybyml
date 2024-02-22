@@ -1,5 +1,5 @@
 project: baseline
-run: test
+run: baseline
 seed: 42
 train:
   batch_size: 32

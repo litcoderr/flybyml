@@ -8,27 +8,30 @@ import lightning.pytorch as pl
 from lightning.pytorch.loggers import WandbLogger
 from lightning.pytorch.callbacks import ModelCheckpoint
 
-from experiment.baseline.main_module import AlfredBaseline
-from experiment.baseline_without_vis.main_module import AlfredBaselineWithoutVis
+from experiment.baseline.baseline import AlfredBaseline
+from experiment.baseline.without_vis import AlfredBaselineWithoutVis
 from dataset.baseline import BaselineDataModule
 
 cur_dir = Path(os.path.dirname(__file__)) 
 
 DATA_MODULE = {
-    'baseline': BaselineDataModule,
-    'baseline_without_vis': BaselineDataModule
+    'baseline': {
+        'baseline': BaselineDataModule,
+        'without_vis': BaselineDataModule
+    }
 }
 
 PL_MODULE = {
-    'baseline': AlfredBaseline,
-    'baseline_without_vis': AlfredBaselineWithoutVis
+    'baseline': {
+        'baseline': AlfredBaseline,
+        'without_vis': AlfredBaselineWithoutVis
+    }
 }
-
 
 def main(args):
     pl.seed_everything(42)
-    datamodule = DATA_MODULE[args.project](args)
-    model = PL_MODULE[args.project](args)
+    datamodule = DATA_MODULE[args.project][args.run](args)
+    model = PL_MODULE[args.project][args.run](args)
     
     logger = WandbLogger(project=args.project, name=args.run, entity='flybyml')
     logger.watch(model)

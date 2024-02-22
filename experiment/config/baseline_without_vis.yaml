@@ -1,5 +1,5 @@
-project: baseline_without_vis
-run: v1_wplot
+project: baseline
+run: without_vis
 seed: 42
 train:
   batch_size: 32
