@@ -10,6 +10,7 @@ from lightning.pytorch.callbacks import ModelCheckpoint
 
 from experiment.baseline.baseline import AlfredBaseline
 from experiment.baseline.without_vis import AlfredBaselineWithoutVis
+from experiment.baseline.teacher_force import AlfredBaselineTeacherForce
 from dataset.baseline import BaselineDataModule
 
 cur_dir = Path(os.path.dirname(__file__)) 
@@ -17,14 +18,16 @@ cur_dir = Path(os.path.dirname(__file__))
 DATA_MODULE = {
     'baseline': {
         'baseline': BaselineDataModule,
-        'without_vis': BaselineDataModule
+        'without_vis': BaselineDataModule,
+        'teacher_force': BaselineDataModule,
     }
 }
 
 PL_MODULE = {
     'baseline': {
         'baseline': AlfredBaseline,
-        'without_vis': AlfredBaselineWithoutVis
+        'without_vis': AlfredBaselineWithoutVis,
+        'teacher_force': AlfredBaselineTeacherForce
     }
 }
 

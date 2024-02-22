@@ -72,13 +72,14 @@ class BaselineDataset(Dataset):
         
         # sample starting index
         total_length = len(data)
-        start_idx = random.randint(0, total_length-self.seq_length)
+        start_idx = random.randint(1, total_length-self.seq_length)
 
         sensory_observations = []
         instructions = []
         actions = []
+        prev_actions = []
         camera_actions = []
-        for datum in data[start_idx:start_idx+self.seq_length]:
+        for rel_idx, datum in enumerate(data[start_idx:start_idx+self.seq_length]):
             # construct instructions
             relative_position = torch.tensor(datum['state']['position']) - tgt_position
             relative_heading = datum['state']['attitude'][2] - tgt_heading
@@ -108,28 +109,27 @@ class BaselineDataset(Dataset):
                 datum['control']['reverse_thrust'] * -1,
             ]))
 
+            prev_idx = start_idx + rel_idx -1
+            prev_actions.append(torch.tensor([
+                (data[prev_idx]['control']['elevator'] + 1) / 2,
+                (data[prev_idx]['control']['aileron'] + 1) / 2,
+                (data[prev_idx]['control']['rudder'] + 1) / 2,
+                data[prev_idx]['control']['thrust'],
+                data[prev_idx]['control']['gear'],
+                data[prev_idx]['control']['flaps'],
+                (data[prev_idx]['control']['trim'] + 1) / 2,
+                data[prev_idx]['control']['brake'],
+                data[prev_idx]['control']['speed_brake'],
+                data[prev_idx]['control']['reverse_thrust'] * -1,
+            ]))
+
             # construct camera
             camera_actions.append(torch.tensor(datum['control']['camera']))
-
-        # # load image
-        # to_tensor = ToTensor()
-        # resize = Resize(size=256)
-        # center_crop = CenterCrop(size=224)
-
-        # img_root = self.root / "image" / self.split[idx]
-        # visual_observations = []
-        # img_names = os.listdir(img_root)
-        # img_names.sort()
-        # for img_name in img_names[start_idx:start_idx+self.seq_length]:
-        #     img = to_tensor(Image.open(img_root / img_name))
-        #     resized_img = resize(img)
-        #     cropped_img = center_crop(resized_img)
-        #     visual_observations.append(cropped_img)
-        # visual_observations = torch.stack(visual_observations, dim=0) # [seq_length, 3, 224, 224]
 
         sensory_observations = torch.stack(sensory_observations, dim=0)
         instructions = torch.stack(instructions, dim=0)
         actions = torch.stack(actions, dim=0)
+        prev_actions = torch.stack(prev_actions, dim=0)
         camera_actions = torch.stack(camera_actions, dim=0)
 
         return {
@@ -137,6 +137,7 @@ class BaselineDataset(Dataset):
             'sensory_observations': sensory_observations,
             'instructions': instructions,
             'actions': actions,
+            'prev_actions': prev_actions,
             'camera_actions': camera_actions
         }
 

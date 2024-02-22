@@ -9,7 +9,7 @@
             "type": "python",
             "request": "launch",
             "module": "experiment.train",
-            "args": ["baseline_without_vis"],
+            "args": ["baseline_teacher_force"],
             "justMyCode": true
         },
     ]

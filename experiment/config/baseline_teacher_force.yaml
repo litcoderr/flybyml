@@ -1,0 +1,26 @@
+project: baseline
+run: teacher_force
+seed: 42
+train:
+  batch_size: 32
+  num_workers: 4
+  gpus: 1
+  num_epochs: 100000
+  save_epochs: 500
+  plot_every_epochs: 500
+test:
+  batch_size: 32
+  num_workers: 4
+model:
+  vis_encoder:
+    type: resnet50
+    dframe: 512
+  dsensory: 4
+  dinst: 4
+  daction: 10
+  temporal_network:
+    num_layers: 2
+    hidden_size: 64
+  dropout: 0.1
+dataset:
+  root: /data/flybyml_dataset_v1
