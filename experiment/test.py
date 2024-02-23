@@ -3,36 +3,28 @@ from typing import Optional
 import sys
 from omegaconf import OmegaConf
 
-import math
-import torch
 import time
 import random
 import numpy as np
 import pygetwindow as pw
 import pyautogui
 from PIL.Image import Image
-from torchvision.transforms import ToTensor, Resize, CenterCrop
 
-from util import ft_to_me
-from aircraft import Aircraft
-from aircraft.b738 import B738
-from state.pos import Position
-from state.state import PlaneState
 from controls import Controls, Camera
-from agents import AgentInterface
+from util import ft_to_me
+from state.pos import Position
 from airport import sample_tgt_rwy_and_position, Runway
-from api import API
 from environment import XplaneEnvironment
 from weather import Weather, ChangeMode, \
     CloudBaseMsl, CloudTopMsl, CloudCoverage, CloudType, \
     Precipitation, RunwayWetness, Temperature, \
     WindMsl, WindDirection, WindSpeed, WindTurbulence, WindShearDirection, WindShearMaxSpeed
 from dataset.collector.gui import StarterGui
-from experiment.baseline.main_module import AlfredBaseline
+
+from agents.embodied_ai import AlfredBaselineTeacherForceAgent
 
 
 class Config:
-    aircraft: Aircraft = B738()
     init_pos: Position = Position(lat=37.5326, lon=127.024612, alt=1000) 
     init_heading: float = 0 # degrees
     init_speed: float = 128 # m/s
@@ -110,98 +102,19 @@ def get_screen() -> Image:
     return screenshot
 
 
-class MLAgent(AgentInterface):
-    def __init__(self, args, aircraft: Aircraft):
-        super().__init__(aircraft)
-        self.api: Optional[API] = None
-        self.model = AlfredBaseline.load_from_checkpoint('C:\\Users\\litco\\Desktop\\project\\flybyml\\checkpoint\\epoch=7041-step=35210.ckpt', args=args.model).to('cuda')
-        self.context = None
-    
-    def set_api(self, api: API):
-        self.api = api
-    
-    def sample_action(self, state: PlaneState, **kwargs) -> Controls:
-        if self.api is None:
-            raise Exception("Use set_api(api) to set api")
-        # 1. Construct Model Input
-
-        # set target
-        tgt_rwy = Config.tgt_rwy.serialize()
-        tgt_position = torch.tensor(tgt_rwy['position'])
-        tgt_heading = tgt_rwy['attitude'][2]
-
-        # state and image input
-        state = state.serialize()
-
-        # 1-1. construct instruction
-        relative_position = torch.tensor(state['position']) - tgt_position
-        relative_heading = state['attitude'][2] - tgt_heading
-        if relative_heading > 180:
-            relative_heading = - (360 - relative_heading)
-        elif relative_heading < -180:
-            relative_heading += 360
-        relative_heading = torch.tensor([math.radians(relative_heading)])
-        instruction = torch.concat((relative_position, relative_heading))
-        instruction = instruction.reshape(1, 1, *instruction.shape)
-
-        # 1-2. construct sensory observation
-        sensory_observation = torch.tensor([*state['attitude'][:2], state['speed'], state['vertical_speed']])
-        sensory_observation = sensory_observation.reshape(1, 1, *sensory_observation.shape)
-
-        # 1-3. construct visual observation
-        to_tensor = ToTensor()
-        resize = Resize(size=256)
-        center_crop = CenterCrop(size=224)
-
-        visual_observation = to_tensor(kwargs['screen'])
-        visual_observation = resize(visual_observation)
-        visual_observation = center_crop(visual_observation)
-        visual_observation = visual_observation.reshape(1, 1, *visual_observation.shape)
-
-        # 2. infer
-        with torch.no_grad():
-            output, context = self.model({
-                'visual_observations': visual_observation.to('cuda'),
-                'sensory_observations': sensory_observation.to('cuda'),
-                'instructions': instruction.to('cuda'),
-            }, self.context)
-            self.context = context
-            output = output[0][0].to('cpu')
-        
-        # 3. construct action
-        elevator = float(2 * output[0] - 1)
-        aileron = float(2 * output[1] - 1)
-        rudder = float(2 * output[2] - 1)
-        thrust = float(output[3])
-        gear = float(output[4])
-        flaps = float(output[5])
-        trim = float(2 * output[6] - 1)
-        brake = float(output[7])
-        spd_brake = float(output[8])
-        reverser = float(-1 * output[9])
-
-        controls = Controls(elev=elevator,
-                            ail=aileron,
-                            rud=rudder,
-                            thr=thrust,
-                            gear=gear,
-                            flaps=flaps,
-                            trim=trim,
-                            brake=brake,
-                            spd_brake=spd_brake,
-                            reverse=reverser,
-                            camera=Camera(*[float(camera_input) for camera_input in output[10:]]))
-        return controls
-
+AGENT = {
+    'baseline': {
+        'teacher_force': AlfredBaselineTeacherForceAgent
+    }
+}
 
 if __name__ == "__main__":
     conf = OmegaConf.load(sys.argv[1])
     conf.merge_with_cli()
     
     # set up human agent and environment
-    agent = MLAgent(conf, Config.aircraft)
+    agent = AGENT[conf.project][conf.run](conf)
     env = XplaneEnvironment(agent = agent)
-    agent.set_api(env.api)
 
     while True:
         # randomize configuration
@@ -231,13 +144,18 @@ if __name__ == "__main__":
         window[0].activate()
 
         # run simulation until end of session
-        buffer = []
         start_time = time.time()
         step_id = 0
+        prev_controls = Controls(*[0 for _ in range(10)], camera=Camera(*[0 for _ in range(6)]))
         while True:
             # get state and control inputs
             screen = get_screen()
-            state, controls, abs_time = env.step(screen=screen)
+            state, controls, abs_time = env.step(
+                screen=screen,
+                tgt_rwy=Config.tgt_rwy,
+                prev_actions=prev_controls
+            )
             rel_time = abs_time - start_time
+            prev_controls = controls
 
             step_id += 1
