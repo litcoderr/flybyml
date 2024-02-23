@@ -1,14 +1,15 @@
 from typing import Optional
 
+import os
 import sys
-from omegaconf import OmegaConf
-
 import time
 import random
 import numpy as np
 import pygetwindow as pw
 import pyautogui
 from PIL.Image import Image
+from pathlib import Path
+from omegaconf import OmegaConf
 
 from controls import Controls, Camera
 from util import ft_to_me
@@ -109,7 +110,9 @@ AGENT = {
 }
 
 if __name__ == "__main__":
-    conf = OmegaConf.load(sys.argv[1])
+    cur_dir = Path(os.path.dirname(__file__)) 
+    config_name = sys.argv[1]
+    conf = OmegaConf.load(cur_dir / "config"/ f"{config_name}.yaml")
     conf.merge_with_cli()
     
     # set up human agent and environment

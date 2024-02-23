@@ -63,7 +63,7 @@ class AlfredAgent(MLAgentBase):
 class AlfredBaselineTeacherForceAgent(AgentInterface):
     def __init__(self, args):
         super().__init__(B738())
-        self.model = AlfredBaselineTeacherForce.load_from_checkpoint('C:\\Users\\litco\\Desktop\\project\\flybyml\\checkpoint\\epoch=7041-step=35210.ckpt', args=args.model, map_location=torch.device("cuda"))
+        self.model = AlfredBaselineTeacherForce.load_from_checkpoint('C:\\Users\\litco\\Desktop\\project\\flybyml\\checkpoint\\epoch=26499-val_loss=0.000.ckpt', args=args, map_location=torch.device("cuda"))
         self.context = None
     
     def sample_action(self, state: PlaneState, **kwargs) -> Controls:
@@ -91,12 +91,26 @@ class AlfredBaselineTeacherForceAgent(AgentInterface):
         sensory_observation = torch.tensor([*state['attitude'][:2], state['speed'], state['vertical_speed']])
         sensory_observation = sensory_observation.reshape(1, 1, *sensory_observation.shape)
 
+        # 1-3. construct prev action
+        prev_action = torch.tensor([
+            (kwargs['prev_actions'].elev + 1) / 2,
+            (kwargs['prev_actions'].ail + 1) / 2,
+            (kwargs['prev_actions'].rud + 1) / 2,
+            kwargs['prev_actions'].thr,
+            kwargs['prev_actions'].gear,
+            kwargs['prev_actions'].flaps,
+            (kwargs['prev_actions'].trim + 1) / 2,
+            kwargs['prev_actions'].brake,
+            kwargs['prev_actions'].spd_brake,
+            kwargs['prev_actions'].reverse * -1,
+        ]).reshape(1, 1, 10)
+
         # 2. infer
-        # TODO add prev_actions to model input
         with torch.no_grad():
             output, context = self.model({
                 'sensory_observations': sensory_observation.to('cuda'),
                 'instructions': instruction.to('cuda'),
+                'prev_actions': prev_action.to('cuda')
             }, self.context)
             self.context = context
             output = output[0][0].to('cpu')
@@ -115,13 +129,13 @@ class AlfredBaselineTeacherForceAgent(AgentInterface):
 
         controls = Controls(elev=elevator,
                             ail=aileron,
-                            rud=rudder,
+                            rud=0,
                             thr=thrust,
                             gear=gear,
                             flaps=flaps,
                             trim=trim,
-                            brake=brake,
-                            spd_brake=spd_brake,
-                            reverse=reverser,
+                            brake=0,
+                            spd_brake=0,
+                            reverse=0,
                             camera=Camera(*[0 for _ in range(6)]))
         return controls

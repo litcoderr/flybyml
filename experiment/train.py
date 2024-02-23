@@ -1,17 +1,16 @@
 import os
 import sys
+import lightning.pytorch as pl
 from pathlib import Path
 from omegaconf import OmegaConf
-
 from lightning import Trainer
-import lightning.pytorch as pl
 from lightning.pytorch.loggers import WandbLogger
 from lightning.pytorch.callbacks import ModelCheckpoint
 
+from dataset.baseline import BaselineDataModule
 from experiment.baseline.baseline import AlfredBaseline
 from experiment.baseline.without_vis import AlfredBaselineWithoutVis
 from experiment.baseline.teacher_force import AlfredBaselineTeacherForce
-from dataset.baseline import BaselineDataModule
 
 cur_dir = Path(os.path.dirname(__file__)) 
 

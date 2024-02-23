@@ -12,5 +12,13 @@
             "args": ["baseline_teacher_force"],
             "justMyCode": true
         },
+        {
+            "name": "test",
+            "type": "python",
+            "request": "launch",
+            "module": "experiment.test",
+            "args": ["baseline_teacher_force"],
+            "justMyCode": true
+        },
     ]
 }
