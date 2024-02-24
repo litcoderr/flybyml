@@ -8,9 +8,12 @@ from lightning.pytorch.loggers import WandbLogger
 from lightning.pytorch.callbacks import ModelCheckpoint
 
 from dataset.baseline import BaselineDataModule
+from dataset.simple_fc import FCBaselineDataModule
 from experiment.baseline.baseline import AlfredBaseline
 from experiment.baseline.without_vis import AlfredBaselineWithoutVis
 from experiment.baseline.teacher_force import AlfredBaselineTeacherForce
+from experiment.simple_fc.base import FCBaseline
+from experiment.simple_fc.batch_normalize import FCBaselineBatchNormalize
 
 cur_dir = Path(os.path.dirname(__file__)) 
 
@@ -19,6 +22,10 @@ DATA_MODULE = {
         'baseline': BaselineDataModule,
         'without_vis': BaselineDataModule,
         'teacher_force': BaselineDataModule,
+    },
+    'simple_fc': {
+        'teacher_force': FCBaselineDataModule,
+        'bn_teacher_force': FCBaselineDataModule,
     }
 }
 
@@ -26,7 +33,11 @@ PL_MODULE = {
     'baseline': {
         'baseline': AlfredBaseline,
         'without_vis': AlfredBaselineWithoutVis,
-        'teacher_force': AlfredBaselineTeacherForce
+        'teacher_force': AlfredBaselineTeacherForce,
+    },
+    'simple_fc': {
+        'teacher_force': FCBaseline,
+        'bn_teacher_force': FCBaselineBatchNormalize,
     }
 }
 
