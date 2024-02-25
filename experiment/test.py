@@ -22,7 +22,7 @@ from weather import Weather, ChangeMode, \
     WindMsl, WindDirection, WindSpeed, WindTurbulence, WindShearDirection, WindShearMaxSpeed
 from dataset.collector.gui import StarterGui
 
-from agents.embodied_ai import AlfredBaselineTeacherForceAgent
+from agents.embodied_ai import AlfredBaselineTeacherForceAgent, FcBnAgent
 
 
 class Config:
@@ -106,6 +106,9 @@ def get_screen() -> Image:
 AGENT = {
     'baseline': {
         'teacher_force': AlfredBaselineTeacherForceAgent
+    },
+    'simple_fc': {
+        'batch_normalize': FcBnAgent
     }
 }
 

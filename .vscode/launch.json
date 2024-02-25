@@ -17,7 +17,7 @@
             "type": "python",
             "request": "launch",
             "module": "experiment.test",
-            "args": ["baseline_teacher_force"],
+            "args": ["fc_batch_normalize"],
             "justMyCode": true
         },
     ]
