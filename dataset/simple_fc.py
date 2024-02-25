@@ -21,7 +21,7 @@ class FCBaselineDataset(Dataset):
         # load split
         split_path = self.root / "split" / f"{self.dataset_type}.json"
         with open(split_path, "r") as f:
-            # self.split ex) ['session_id_0', 'session_id_1, ...]
+            # session_ids: ['session_id_0', 'session_id_1, ...]
             session_ids = json.load(f)
     
         # load all data once
@@ -43,8 +43,8 @@ class FCBaselineDataset(Dataset):
             
             for idx, datum in enumerate(data[1:]):
                 # construct instructions
-                relative_position = torch.tensor(data['state']['position']) - tgt_position
-                relative_heading = data['state']['attitude'][2] - tgt_heading
+                relative_position = torch.tensor(datum['state']['position']) - tgt_position
+                relative_heading = datum['state']['attitude'][2] - tgt_heading
                 if relative_heading > 180:
                     relative_heading = - (360 - relative_heading)
                 elif relative_heading < -180:

@@ -24,8 +24,8 @@ DATA_MODULE = {
         'teacher_force': BaselineDataModule,
     },
     'simple_fc': {
-        'teacher_force': FCBaselineDataModule,
-        'bn_teacher_force': FCBaselineDataModule,
+        'base': FCBaselineDataModule,
+        'batch_normalize': FCBaselineDataModule,
     }
 }
 
@@ -36,8 +36,8 @@ PL_MODULE = {
         'teacher_force': AlfredBaselineTeacherForce,
     },
     'simple_fc': {
-        'teacher_force': FCBaseline,
-        'bn_teacher_force': FCBaselineBatchNormalize,
+        'base': FCBaseline,
+        'batch_normalize': FCBaselineBatchNormalize,
     }
 }
 
