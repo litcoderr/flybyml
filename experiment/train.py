@@ -14,6 +14,7 @@ from experiment.baseline.without_vis import AlfredBaselineWithoutVis
 from experiment.baseline.teacher_force import AlfredBaselineTeacherForce
 from experiment.simple_fc.base import FCBaseline
 from experiment.simple_fc.batch_normalize import FCBaselineBatchNormalize
+from experiment.rl.ddpg import DDPGModule
 
 cur_dir = Path(os.path.dirname(__file__)) 
 
@@ -41,28 +42,37 @@ PL_MODULE = {
     }
 }
 
-def main(args):
-    pl.seed_everything(42)
-    datamodule = DATA_MODULE[args.project][args.run](args)
-    model = PL_MODULE[args.project][args.run](args)
-    
-    logger = WandbLogger(project=args.project, name=args.run, entity='flybyml')
-    logger.watch(model)
-    
-    ckpt_path = cur_dir / args.project / "logs" / args.run
-    checkpoint_callback = ModelCheckpoint(
-        every_n_epochs=args.train.save_epochs,
-        monitor="val_loss", 
-        dirpath=ckpt_path, 
-        filename="{epoch:04d}-{val_loss:.3f}"
-    )
+RL_MODULE = {
+    'ddpg': DDPGModule
+}
 
-    trainer = Trainer(max_epochs=args.train.num_epochs,
-                      devices=args.train.gpus,
-                      logger=logger,
-                      callbacks=[checkpoint_callback],
-                      deterministic=True)
-    trainer.fit(model, datamodule)
+def main(args):
+    if args.project == 'rl':
+        # run custom training function for RL
+        rl = RL_MODULE[args.run](args)
+        rl.train()
+    else:
+        pl.seed_everything(42)
+        datamodule = DATA_MODULE[args.project][args.run](args)
+        model = PL_MODULE[args.project][args.run](args)
+        
+        logger = WandbLogger(project=args.project, name=args.run, entity='flybyml')
+        logger.watch(model)
+        
+        ckpt_path = cur_dir / args.project / "logs" / args.run
+        checkpoint_callback = ModelCheckpoint(
+            every_n_epochs=args.train.save_epochs,
+            monitor="val_loss", 
+            dirpath=ckpt_path, 
+            filename="{epoch:04d}-{val_loss:.3f}"
+        )
+
+        trainer = Trainer(max_epochs=args.train.num_epochs,
+                        devices=args.train.gpus,
+                        logger=logger,
+                        callbacks=[checkpoint_callback],
+                        deterministic=True)
+        trainer.fit(model, datamodule)
 
 
 if __name__ == "__main__":
