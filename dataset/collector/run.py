@@ -13,7 +13,7 @@ from pathlib import Path
 from PIL.Image import Image
 from enum import Enum
 
-from util import ft_to_me, haversine_distance_and_bearing, kts_to_mps
+from util import ft_to_me, haversine_distance_and_bearing, sample_weather
 from aircraft import Aircraft
 from aircraft.b738 import B738
 from state.pos import Position
@@ -23,10 +23,7 @@ from agents import AgentInterface
 from airport import sample_tgt_rwy_and_position, Runway
 from api import API
 from environment import XplaneEnvironment
-from weather import Weather, ChangeMode, \
-    CloudBaseMsl, CloudTopMsl, CloudCoverage, CloudType, \
-    Precipitation, RunwayWetness, Temperature, \
-    WindMsl, WindDirection, WindSpeed, WindTurbulence, WindShearDirection, WindShearMaxSpeed
+from weather import Weather
 from dataset.collector.atc import ATC
 from dataset.collector.gui import StarterGui
 
@@ -86,58 +83,6 @@ def sample_zulu_time() -> float:
     seconds_per_day = 86400
     return seconds_per_day * random.random()
 
-def sample_weather(apt_elev: float) -> Weather:
-    """
-    apt_elev: airport elevation in meters
-    returns sampled Weather object
-    """
-    # sample cloud
-    cloud_base_msl = apt_elev + random.uniform(ft_to_me(1500), ft_to_me(4000))
-    cloud_top_msl = random.uniform(cloud_base_msl + ft_to_me(5000), cloud_base_msl + ft_to_me(8000))
-    cloud_coverage = random.uniform(0, 1)
-    cloud_type = float(np.random.choice(np.arange(0, 4), p=[0.4, 0.4, 0.2, 0.0]))
-
-    # sample precipitation
-    precipitation = random.uniform(0, 1)
-    temperature = random.uniform(-50, 50)
-    if precipitation < 0.1:
-        runway_wetness = 0
-    else:
-        if temperature < 0:
-            runway_wetness = 6 * precipitation - random.uniform(-1, 0)
-        else:
-            runway_wetness = 7 + 6 * precipitation - random.uniform(-1, 0)
-
-    wind_msl = random.uniform(apt_elev + ft_to_me(50), cloud_top_msl)
-    wind_direction = random.uniform(0, 360)
-    wind_speed = float(np.random.choice(np.arange(0, 10, 2), p=[0.4, 0.4, 0.2, 0, 0]))
-    wind_turbulence = float(np.random.choice(np.arange(0, 1, 0.2), p=[0.6, 0.35, 0.05, 0, 0]))
-    wind_shear_direction = random.uniform(wind_direction-5, wind_direction+5)
-    if wind_shear_direction < 0:
-        wind_shear_direction += 360
-    wind_shear_direction %= 360
-    wind_shear_max_speed = float(np.random.choice(np.arange(0,5,1), p=[0.5, 0.3, 0.15, 0.05, 0]))
-
-    weather = Weather(
-        change_mode = ChangeMode(random.randint(0, 6)),
-
-        cloud_base_msl = CloudBaseMsl([cloud_base_msl, 0, 0]),
-        cloud_top_msl = CloudTopMsl([cloud_top_msl, 0, 0]),
-        cloud_coverage = CloudCoverage([cloud_coverage, 0, 0]),
-        cloud_type = CloudType([cloud_type, 0, 0]),
-
-        precipitation = Precipitation(precipitation),
-        runway_wetness = RunwayWetness(runway_wetness),
-        temperature = Temperature(temperature),
-
-        wind_msl = WindMsl([wind_msl, wind_msl + ft_to_me(1100),0,0,0,0,0,0,0,0,0,0,0]),
-        wind_direction = WindDirection([wind_direction,wind_direction,0,0,0,0,0,0,0,0,0,0,0]),
-        wind_speed = WindSpeed([wind_speed,wind_speed,0,0,0,0,0,0,0,0,0,0,0]),
-        wind_turbulence = WindTurbulence([wind_turbulence,wind_turbulence,0,0,0,0,0,0,0,0,0,0,0]),
-        wind_shear_direction = WindShearDirection([wind_shear_direction,wind_shear_direction,0,0,0,0,0,0,0,0,0,0,0]),
-        wind_shear_max_speed = WindShearMaxSpeed([wind_shear_max_speed,wind_shear_max_speed,0,0,0,0,0,0,0,0,0,0,0])
-    )
-    return weather
 
 if __name__ == "__main__":
     DATASET_ROOT = Path('D:\\dataset\\flybyml_dataset_v2')

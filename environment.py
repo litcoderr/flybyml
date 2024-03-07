@@ -1,7 +1,8 @@
-from typing import Tuple
+from typing import Tuple, Optional
 
 import time
 
+from util import sample_weather
 from agents import AgentInterface
 from api import API
 from state.state import PlaneState
@@ -15,7 +16,7 @@ class XplaneEnvironment:
 
         self.api = API()  # xpilot controller
     
-    def reset(self, lat, lon, alt, heading, spd, zulu_time, weather: Weather) -> PlaneState:
+    def reset(self, lat, lon, alt, heading, spd, zulu_time, weather: Optional[Weather]=None) -> PlaneState:
         """
         lat: degree
         lon: degree
@@ -25,6 +26,9 @@ class XplaneEnvironment:
         zulu_time: GMT time. seconds since midnight
         weather: Weather object
         """
+        if weather == None:
+            weather = sample_weather()
+
         self.api.set_init_state(self.agent.aircraft, lat, lon, alt, heading, spd)
         # set time / weather
         while True:
