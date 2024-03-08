@@ -13,7 +13,7 @@ class Camera:
         return f"x[{self.x}] y[{self.y}] z[{self.z}] heading[{self.heading}] pitch[{self.pitch}] roll[{self.roll}]"
 
 class Controls:
-    def __init__(self, elev, ail, rud, thr, gear, flaps, trim, brake, spd_brake, reverse, camera: Camera):
+    def __init__(self, elev, ail, rud, thr, gear, flaps, trim, brake, spd_brake, reverse, camera: Camera = Camera(0,0,0,0,0,0)):
         """
         lat: [-1, 1]
         lon: [-1, 1]

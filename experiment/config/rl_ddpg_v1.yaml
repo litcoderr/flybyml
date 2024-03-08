@@ -1,8 +1,12 @@
 project: rl
 run: ddpg_v1
-seed: 42
 device: cuda
+step_interval: 0.1
 train:
   total_steps: 100000000
   reset_period: 1000
-  start_steps: 10000
+  start_steps: 0 # TODO needs to be changed to a larger value
+  act_noise: 0.1
+model:
+  obs_dim: 9 # [e_pitch, e_roll, e_spd, d_roll, d_pitch, d_spd, i_roll, i_pitch, i_spd]
+  act_dim: 3 # [d_elev, d_ail, d_thrust]

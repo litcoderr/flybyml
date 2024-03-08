@@ -115,7 +115,7 @@ if __name__ == "__main__":
         Config.weather = sample_weather(target_rwy.elev)
         Config.tgt_rwy = target_rwy
 
-        state = env.reset(
+        state, _ = env.reset(
             lat = Config.init_pos.lat,
             lon = Config.init_pos.lon,
             alt = Config.init_pos.alt,

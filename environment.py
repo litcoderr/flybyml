@@ -2,10 +2,8 @@ from typing import Tuple, Optional
 
 import time
 
-from torch import Tensor
-
 from aircraft.b738 import B738
-from util import sample_weather
+from util import sample_weather, kts_to_mps
 from agents import AgentInterface
 from api import API
 from state.state import PlaneState
@@ -19,7 +17,7 @@ class XplaneEnvironment:
 
         self.api = API()  # xpilot controller
     
-    def reset(self, lat, lon, alt, heading, spd, zulu_time, weather: Optional[Weather]=None, pause=False) -> PlaneState:
+    def reset(self, lat, lon, alt, heading, spd, zulu_time, weather: Optional[Weather]=None) -> Tuple[PlaneState, Controls]:
         """
         lat: degree
         lon: degree
@@ -42,13 +40,14 @@ class XplaneEnvironment:
             except Exception as e:
                 print(e)
                 time.sleep(0.1)
-        self.api.init_ctrl() 
-        state = self.getState()
+        while True:
+            # wait for simulator to load
+            init_state = self.getState()
+            if init_state.spd > kts_to_mps(130):
+                break
+        init_ctrl = self.api.init_ctrl() 
 
-        if pause:
-            self.api.pause()
-
-        return state
+        return init_state, init_ctrl
     
     def step(self, **kwargs) -> Tuple[PlaneState, Controls, float]:
         while True:
@@ -61,7 +60,7 @@ class XplaneEnvironment:
                 time.sleep(0.1)
         return current_state, controls, time.time()
 
-    def rl_step(self, action: Controls, step_interval=0.3) -> PlaneState:
+    def rl_step(self, action: Controls, step_interval=0.1) -> PlaneState:
         """
         take a step in this environment with given action(Controls)
 

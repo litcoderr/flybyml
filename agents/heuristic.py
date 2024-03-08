@@ -358,7 +358,7 @@ if __name__ == "__main__":
     env = XplaneEnvironment(agent, frame_interval=0.1)
 
     def simulation():
-        state = env.reset(lat=32, lon=32, alt=1000, heading=320, spd=30)
+        state, _ = env.reset(lat=32, lon=32, alt=1000, heading=320, spd=30)
         while True:
             state = env.step(state)
 

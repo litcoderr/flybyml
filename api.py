@@ -175,6 +175,8 @@ class API(object):
         set_dref("sim/cockpit2/switches/strobe_lights_on", 1.0)
         set_dref("sim/cockpit2/switches/taxi_light_on", 1.0)
         set_dref("sim/cockpit2/switches/landing_lights_switch", [1.0 for _ in range(16)])
+        
+        return init_ctrl
     
     def send_ctrl(self, controls: Controls):
         with xpc.XPlaneConnect() as client:
