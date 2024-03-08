@@ -2,6 +2,9 @@ from typing import Tuple, Optional
 
 import time
 
+from torch import Tensor
+
+from aircraft.b738 import B738
 from util import sample_weather
 from agents import AgentInterface
 from api import API
@@ -16,7 +19,7 @@ class XplaneEnvironment:
 
         self.api = API()  # xpilot controller
     
-    def reset(self, lat, lon, alt, heading, spd, zulu_time, weather: Optional[Weather]=None) -> PlaneState:
+    def reset(self, lat, lon, alt, heading, spd, zulu_time, weather: Optional[Weather]=None, pause=False) -> PlaneState:
         """
         lat: degree
         lon: degree
@@ -29,7 +32,7 @@ class XplaneEnvironment:
         if weather == None:
             weather = sample_weather()
 
-        self.api.set_init_state(self.agent.aircraft, lat, lon, alt, heading, spd)
+        self.api.set_init_state(B738(), lat, lon, alt, heading, spd)
         # set time / weather
         while True:
             try:
@@ -41,6 +44,9 @@ class XplaneEnvironment:
                 time.sleep(0.1)
         self.api.init_ctrl() 
         state = self.getState()
+
+        if pause:
+            self.api.pause()
 
         return state
     
@@ -54,6 +60,30 @@ class XplaneEnvironment:
             except:
                 time.sleep(0.1)
         return current_state, controls, time.time()
+
+    def rl_step(self, action: Controls, step_interval=0.3) -> PlaneState:
+        """
+        take a step in this environment with given action(Controls)
+
+        Args:
+            action: Controls
+            step_interval: interval (in seconds) between prev state and next state
+
+        Return:
+            next PlaneState
+        """
+        while True:
+            try:
+                self.api.resume()
+                self.api.send_ctrl(action)
+                break
+            except:
+                self.api.pause()
+                time.sleep(0.05)
+        time.sleep(step_interval)
+        next_state = self.getState()
+        self.api.pause()
+        return next_state
 
     def getState(self) -> PlaneState:
         while True:

@@ -22,3 +22,4 @@ class PlaneState:
             "speed": self.spd,
             "vertical_speed": self.vert_spd
         }
+    
