@@ -175,9 +175,9 @@ class DDPGModuleV1:
             act = act.to('cpu')
         act = act.numpy()
 
-        self.control.elev += act[0]
-        self.control.ail += act[1]
-        self.control.thr += (act[2] + 1) / 2
+        self.control.elev += 2 * act[0]
+        self.control.ail += 2 * act[1]
+        self.control.thr += act[2]
 
         # clip control values
         self.control.elev = clip(self.control.elev, -1, 1)
@@ -189,9 +189,7 @@ class DDPGModuleV1:
             #  reset environment with newly sampled weather etc.
             if step % self.args.train.reset_period == 0 or not is_boundary(state):
                 alt, heading, spd = sample_state()
-                self.env.api.resume()
-                state, self.control = self.env.reset(0, 0, alt, heading, spd, 40000)
-                self.env.api.pause()
+                state, self.control = self.env.reset(0, 0, alt, heading, spd, 40000, pause=True)
                 prev_state = state
 
                 # construct objective
@@ -209,14 +207,13 @@ class DDPGModuleV1:
                 # sample action from actor-critic network (non-deterministic in training step for exploration)
                 act_t = self.policy.act(obs_t)
                 act_t += self.args.train.act_noise * torch.normal(0, 1, size=act_t.size()).to(self.args.device)
-                # update control based on action_t
-                self.update_control(act_t)
-                # take step with updated control
-                next_state = self.env.rl_step(self.control, self.args.step_interval)
             else:
-                # TODO randomly sample action for better exploration
-                pass
-            
+                # randomly sample action for better exploration
+                act_t = 2 * torch.rand(3) - 1
+            # update control based on action_t
+            self.update_control(act_t)
+            # take step with updated control
+            next_state = self.env.rl_step(self.control, self.args.step_interval)
 
             prev_state = state
             state = next_state

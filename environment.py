@@ -17,7 +17,7 @@ class XplaneEnvironment:
 
         self.api = API()  # xpilot controller
     
-    def reset(self, lat, lon, alt, heading, spd, zulu_time, weather: Optional[Weather]=None) -> Tuple[PlaneState, Controls]:
+    def reset(self, lat, lon, alt, heading, spd, zulu_time, weather: Optional[Weather]=None, pause=False) -> Tuple[PlaneState, Controls]:
         """
         lat: degree
         lon: degree
@@ -27,6 +27,7 @@ class XplaneEnvironment:
         zulu_time: GMT time. seconds since midnight
         weather: Weather object
         """
+        self.api.resume()
         if weather == None:
             weather = sample_weather()
 
@@ -46,6 +47,9 @@ class XplaneEnvironment:
             if init_state.spd > kts_to_mps(130):
                 break
         init_ctrl = self.api.init_ctrl() 
+        
+        if pause:
+            self.api.pause()
 
         return init_state, init_ctrl
     
