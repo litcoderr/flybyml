@@ -7,9 +7,11 @@ Training Objective:
 import random
 import torch
 import torch.nn as nn
+import numpy as np
 
 from copy import deepcopy
 from torch import Tensor
+from torch.distributions.normal import Normal
 
 from controls import Controls
 from state.state import PlaneState
@@ -33,6 +35,15 @@ MAX_ROLL = 40
 PITCH_NORM = 180
 ROLL_NORM = 180
 SPD_NORM = kts_to_mps(300)
+
+# frequency constant
+# Tupe[min_freq, max_freq]  (unit corresponds to its key's unit)
+# freq = change of unit per sec
+FREQ = {
+    'pitch': (2, 20),
+    'roll': (2, 20),
+    'spd': (kts_to_mps(5), kts_to_mps(10))
+}
 
 
 def sample_state():
@@ -77,7 +88,7 @@ class PiV1(nn.Module):
     def forward(self, obs: Tensor) -> Tensor:
         """
         Args:
-            obs: observation Tensor [b, 9] [e_pitch, e_roll, e_spd, d_roll, d_pitch, d_spd, i_roll, i_pitch, i_spd]
+            obs: observation Tensor [b, 9] [e_pitch, e_roll, e_spd, traj_pitch, traj_roll, traj_spd, d_roll, d_pitch, d_spd, i_roll, i_pitch, i_spd]
         Return:
             action tensor (delta of control values) [b, 3] [d_elev, d_ail, d_thrust]
                 every delta control's range is [-1, 1]
@@ -101,7 +112,7 @@ class QV1(nn.Module):
     def forward(self, obs: Tensor, action: Tensor) -> Tensor:
         """
         Args:
-            obs: observation Tensor [e_pitch, e_roll, e_spd, d_roll, d_pitch, d_spd, i_roll, i_pitch, i_spd]
+            obs: observation Tensor [e_pitch, e_roll, e_spd, traj_pitch, traj_roll, traj_spd, d_roll, d_pitch, d_spd, i_roll, i_pitch, i_spd]
             action: action Tensor [d_elev, d_ail, d_thrust]
         Return:
             value [b]
@@ -122,12 +133,53 @@ class ActorCriticModelV1(nn.Module):
         Sample action without gradient
 
         Args:
-            obs: observation Tensor [e_pitch, e_roll, e_spd, d_roll, d_pitch, d_spd, i_roll, i_pitch, i_spd]
+            obs: observation Tensor [e_pitch, e_roll, e_spd, traj_pitch, traj_roll, traj_spd, d_roll, d_pitch, d_spd, i_roll, i_pitch, i_spd]
         Return:
             action tensor (delta value of controls) [d_elev, d_ail, d_thrust]
         """
         with torch.no_grad():
             return self.pi(obs)
+
+
+class ReplayBuffer:
+    def __init__(self, args):
+        self.args = args
+        self.batch_size = args.train.batch_size
+        self.max_size = args.train.replay_size
+        self.size = 0
+        self.ptr = 0
+
+        self.obs = np.zeros((self.max_size, args.model.obs_dim), dtype=np.float32)
+        self.act = np.zeros((self.max_size, args.model.act_dim), dtype=np.float32)
+        self.rew = np.zeros(self.max_size, dtype=np.float32)
+        self.next_obs = np.zeros((self.max_size, args.model.obs_dim), dtype=np.float32)
+
+    def store(self, obs: Tensor, act: Tensor, rew: Tensor, next_obs: Tensor):
+        if not obs.is_cpu:
+            obs = obs.to('cpu')
+        if not act.is_cpu:
+            act = act.to('cpu')
+        if not rew.is_cpu:
+            rew = rew.to('cpu')
+        if not next_obs.is_cpu:
+            next_obs = next_obs.to('cpu')
+        self.obs[self.ptr] = obs.detach().numpy()
+        self.act[self.ptr] = act.detach().numpy()
+        self.rew[self.ptr] = rew.detach().numpy()
+        self.next_obs[self.ptr] = next_obs.detach().numpy()
+        self.ptr += 1        
+        if self.ptr >= self.max_size:
+            self.ptr = 0
+        self.size = min(self.size+1, self.max_size)
+
+    def sample_batch(self):
+        idxs = np.random.randint(0, self.size, size=self.batch_size)
+        return dict(
+            obs = torch.as_tensor(self.obs[idxs], dtype=torch.float32).to(self.args.device),
+            act = torch.as_tensor(self.act[idxs], dtype=torch.float32).to(self.args.device),
+            rew = torch.as_tensor(self.rew[idxs], dtype=torch.float32).to(self.args.device),
+            next_obs = torch.as_tensor(self.next_obs[idxs], dtype=torch.float32).to(self.args.device)
+        )
 
 
 class DDPGModuleV1:
@@ -143,26 +195,36 @@ class DDPGModuleV1:
         self.target = deepcopy(self.policy)
         self.policy = self.policy.to(args.device)
         self.target = self.target.to(args.device)
+
+        # replay buffer
+        self.buf = ReplayBuffer(args)
+
     
-    def get_observation(self, cur_state: PlaneState, prev_state: PlaneState, objective) -> Tensor:
+    def construct_observation(self, step: int, cur_state: PlaneState, prev_state: PlaneState, objective) -> Tensor:
         """
         construct observation based on current state and prev states
 
         Return:
-            observation: Tensor [e_pitch, e_roll, e_spd, d_roll, d_pitch, d_spd, i_roll, i_pitch, i_spd]
+            observation: Tensor [e_pitch, e_roll, e_spd, traj_pitch, traj_roll, traj_spd, d_roll, d_pitch, d_spd, i_roll, i_pitch, i_spd]
                 e_: stands for error
+                traj_: stands for trajectory error
                 d_: stands for delta
                 i_: stands for intensty [0-1]
         """
+        traj = self.get_trajectory(step, objective)
+
         # every value is normalized
         error = torch.tensor([(cur_state.att.pitch - objective['pitch'][0])/PITCH_NORM,
                               (cur_state.att.roll - objective['roll'][0])/ROLL_NORM,
                               (cur_state.spd - objective['spd'][0])/SPD_NORM])
+        traj_error = torch.tensor([(cur_state.att.pitch - traj['pitch'])/PITCH_NORM,
+                              (cur_state.att.roll - traj['roll'])/ROLL_NORM,
+                              (cur_state.spd - traj['spd'])/SPD_NORM])
         delta = torch.tensor([(cur_state.att.pitch - prev_state.att.pitch)/PITCH_NORM,
                               (cur_state.att.roll - prev_state.att.roll)/ROLL_NORM,
                               (cur_state.spd - prev_state.spd)/SPD_NORM])
         intensity = torch.tensor([objective['pitch'][1], objective['roll'][1], objective['spd'][1]])
-        return torch.cat([error, delta, intensity]).to(self.args.device)
+        return torch.cat([error, traj_error, delta, intensity]).to(self.args.device)
     
     def update_control(self, act: Tensor):
         """
@@ -183,6 +245,42 @@ class DDPGModuleV1:
         self.control.elev = clip(self.control.elev, -1, 1)
         self.control.ail = clip(self.control.ail, -1, 1)
         self.control.thr = clip(self.control.thr, 0, 1)
+
+    def get_trajectory(self, step, objective):
+        """
+        Args:
+            step: global step
+            objective
+        """
+        rel_step = step - self.init_step
+        init_error = {
+            'pitch': objective['pitch'][0] - self.init_state.att.pitch,
+            'roll': objective['roll'][0] - self.init_state.att.roll,
+            'spd': objective['spd'][0] - self.init_state.spd
+        }
+        trajectory = {}
+        for key, bias in init_error.items():
+            slope = (FREQ[key][1] - FREQ[key][0]) * objective[key][1] + FREQ[key][0]  # (max_freq - min_freq) * intensity + min_freq
+            if bias > 0:
+                slope *= -1
+            rel_trajectory = slope * self.args.step_interval * rel_step + bias
+            if slope * rel_trajectory >= 0:
+                trajectory[key] = objective[key][0]
+            else:
+                trajectory[key] = rel_trajectory + objective[key][0]
+        return trajectory
+    
+    def construct_reward(self, obs) -> float:
+        """
+        Args:
+            observation: Tensor [e_pitch, e_roll, e_spd, traj_pitch, traj_roll, traj_spd, d_roll, d_pitch, d_spd, i_roll, i_pitch, i_spd]
+        """
+        # reward distribution
+        # TODO decrease scale(sigma) as timestep increases, to give mroe intense reward towards the end of episode
+        scale = self.args.train.rew_scale
+        normal = Normal(torch.tensor([0, 0, 0]).to(self.args.device), torch.tensor([scale, scale, scale]).to(self.args.device))
+        rewards = torch.exp(normal.log_prob(obs[3:6]))
+        return torch.sum(rewards)
     
     def train(self):
         for step in range(self.args.train.total_steps):
@@ -191,6 +289,8 @@ class DDPGModuleV1:
                 alt, heading, spd = sample_state()
                 state, self.control = self.env.reset(0, 0, alt, heading, spd, 40000, pause=True)
                 prev_state = state
+                self.init_step = step
+                self.init_state = state
 
                 # construct objective
                 # add buffer when sampling objective so that the agent has space to explore
@@ -200,20 +300,30 @@ class DDPGModuleV1:
                     'roll': (random.uniform(MIN_ROLL+10, MAX_ROLL-10), random.random()),
                     'spd': (random.uniform(MIN_SPD+kts_to_mps(30), MAX_SPD-kts_to_mps(30)), random.random()),
                 }
-            obs_t = self.get_observation(state, prev_state, objective)
+            obs = self.construct_observation(step, state, prev_state, objective)
 
             # take a step in the environment
             if step >= self.args.train.start_steps:
                 # sample action from actor-critic network (non-deterministic in training step for exploration)
-                act_t = self.policy.act(obs_t)
-                act_t += self.args.train.act_noise * torch.normal(0, 1, size=act_t.size()).to(self.args.device)
+                act = self.policy.act(obs)
+                act += self.args.train.act_noise * torch.normal(0, 1, size=act.size()).to(self.args.device)
             else:
                 # randomly sample action for better exploration
-                act_t = 2 * torch.rand(3) - 1
+                act = 2 * torch.rand(3) - 1
             # update control based on action_t
-            self.update_control(act_t)
+            self.update_control(act)
             # take step with updated control
             next_state = self.env.rl_step(self.control, self.args.step_interval)
+            next_obs = self.construct_observation(step+1, next_state, state, objective)
+
+            # calculate reward
+            rew = self.construct_reward(obs)
+
+            # store in buffer
+            self.buf.store(obs, act, rew, next_obs)
+
+            # TODO update
+            #batch = self.buf.sample_batch()
 
             prev_state = state
             state = next_state
