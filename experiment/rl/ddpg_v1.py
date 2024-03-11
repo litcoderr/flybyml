@@ -1,4 +1,3 @@
-import time
 """
 Training Objective:
     maximi
@@ -12,8 +11,8 @@ import numpy as np
 from copy import deepcopy
 from torch import Tensor
 from torch.distributions.normal import Normal
+from torch.optim import Adam
 
-from controls import Controls
 from state.state import PlaneState
 from util import ft_to_me, kts_to_mps
 from environment import XplaneEnvironment
@@ -153,8 +152,9 @@ class ReplayBuffer:
         self.act = np.zeros((self.max_size, args.model.act_dim), dtype=np.float32)
         self.rew = np.zeros(self.max_size, dtype=np.float32)
         self.next_obs = np.zeros((self.max_size, args.model.obs_dim), dtype=np.float32)
+        self.done = np.zeros(self.max_size, dtype=np.float32)
 
-    def store(self, obs: Tensor, act: Tensor, rew: Tensor, next_obs: Tensor):
+    def store(self, obs: Tensor, act: Tensor, rew: Tensor, next_obs: Tensor, done: bool):
         if not obs.is_cpu:
             obs = obs.to('cpu')
         if not act.is_cpu:
@@ -167,6 +167,7 @@ class ReplayBuffer:
         self.act[self.ptr] = act.detach().numpy()
         self.rew[self.ptr] = rew.detach().numpy()
         self.next_obs[self.ptr] = next_obs.detach().numpy()
+        self.done[self.ptr] = done
         self.ptr += 1        
         if self.ptr >= self.max_size:
             self.ptr = 0
@@ -178,7 +179,8 @@ class ReplayBuffer:
             obs = torch.as_tensor(self.obs[idxs], dtype=torch.float32).to(self.args.device),
             act = torch.as_tensor(self.act[idxs], dtype=torch.float32).to(self.args.device),
             rew = torch.as_tensor(self.rew[idxs], dtype=torch.float32).to(self.args.device),
-            next_obs = torch.as_tensor(self.next_obs[idxs], dtype=torch.float32).to(self.args.device)
+            next_obs = torch.as_tensor(self.next_obs[idxs], dtype=torch.float32).to(self.args.device),
+            done = torch.as_tensor(self.done[idxs], dtype=torch.float32).to(self.args.device)
         )
 
 
@@ -193,8 +195,14 @@ class DDPGModuleV1:
         # initialize model
         self.policy = ActorCriticModelV1(args)
         self.target = deepcopy(self.policy)
+        for p in self.target.parameters():
+            p.requires_grad = False
         self.policy = self.policy.to(args.device)
         self.target = self.target.to(args.device)
+
+        # initialize optimizer
+        self.pi_optim = Adam(self.policy.pi.parameters(), lr=args.train.pi_lr)
+        self.q_optim = Adam(self.policy.q.parameters(), lr=args.train.q_lr)
 
         # replay buffer
         self.buf = ReplayBuffer(args)
@@ -282,10 +290,45 @@ class DDPGModuleV1:
         rewards = torch.exp(normal.log_prob(obs[3:6]))
         return torch.sum(rewards)
     
+    def update(self):
+        batch = self.buf.sample_batch()
+
+        # 1. optimize q policy network
+        self.q_optim.zero_grad()
+        
+        q = self.policy.q(batch['obs'], batch['act'])
+        with torch.no_grad():
+            q_pi_targ = self.target.q(batch['next_obs'], self.target.pi(batch['next_obs']))
+            bellman_backup = batch['rew'] + self.args.train.d_factor * (1-batch['done']) * q_pi_targ
+        q_loss = ((q-bellman_backup)**2).mean()
+        q_loss.backward()
+        self.q_optim.step()
+
+        # 2. optimize pi policy network
+        for p in self.policy.q.parameters():
+            p.requires_grad = False
+
+        self.pi_optim.zero_grad()
+        q_pi = self.policy.q(batch['obs'], self.policy.pi(batch['obs']))
+        pi_loss = -q_pi.mean()
+        pi_loss.backward()
+        self.pi_optim.step()
+
+        for p in self.policy.q.parameters():
+            p.requires_grad = True
+
+        # 3. update target network
+        with torch.no_grad():
+            for policy_p, target_p in zip(self.policy.parameters(), self.target.parameters()):
+                target_p.data.mul_(self.args.train.polyak)
+                target_p.data.add_((1-self.args.train.polyak) * policy_p.data)
+
+    
     def train(self):
+        done = True
         for step in range(self.args.train.total_steps):
             #  reset environment with newly sampled weather etc.
-            if step % self.args.train.reset_period == 0 or not is_boundary(state):
+            if done:
                 alt, heading, spd = sample_state()
                 state, self.control = self.env.reset(0, 0, alt, heading, spd, 40000, pause=True)
                 prev_state = state
@@ -316,14 +359,19 @@ class DDPGModuleV1:
             next_state = self.env.rl_step(self.control, self.args.step_interval)
             next_obs = self.construct_observation(step+1, next_state, state, objective)
 
+            # handle end of episode
+            done = not is_boundary(next_state) or (step - self.init_step) >= self.args.train.max_ep_len
+
             # calculate reward
             rew = self.construct_reward(obs)
 
             # store in buffer
-            self.buf.store(obs, act, rew, next_obs)
+            self.buf.store(obs, act, rew, next_obs, done)
 
-            # TODO update
-            #batch = self.buf.sample_batch()
+            # update
+            if step >= self.args.train.update_after and step % self.args.train.update_every == 0:
+                for _ in range(self.args.train.update_every):
+                    self.update()
 
             prev_state = state
             state = next_state

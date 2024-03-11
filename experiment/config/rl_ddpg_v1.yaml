@@ -5,11 +5,17 @@ step_interval: 0.1
 train:
   batch_size: 32
   total_steps: 100000000
-  reset_period: 1000
   start_steps: 1000 # TODO needs to be changed to a larger value
   act_noise: 0.1
   rew_scale: 1.0
   replay_size: 1000000
+  max_ep_len: 600
+  update_after: 1000
+  update_every: 50
+  pi_lr: 0.001
+  q_lr: 0.001
+  d_factor: 0.99
+  polyak: 0.995
 model:
   obs_dim: 12 # [e_pitch, e_roll, e_spd, traj_pitch, traj_roll, traj_spd, d_roll, d_pitch, d_spd, i_roll, i_pitch, i_spd]
   act_dim: 3 # [d_elev, d_ail, d_thrust]
