@@ -3,12 +3,14 @@ Training Objective:
     maximi
 """
 
+import os
 import random
 import torch
 import wandb
 import torch.nn as nn
 import numpy as np
 
+from pathlib import Path
 from tqdm import tqdm
 from copy import deepcopy
 from torch import Tensor
@@ -56,7 +58,7 @@ def sample_state():
     """
     alt = random.uniform(MIN_ALT, MAX_ALT)
     heading = random.uniform(MIN_HEADING, MAX_HEADING)
-    spd = random.uniform(MIN_SPD+kts_to_mps(30), MAX_SPD-kts_to_mps(30))
+    spd = random.uniform(kts_to_mps(210), MAX_SPD-kts_to_mps(30))
     return alt, heading, spd
 
 
@@ -210,11 +212,13 @@ class DDPGModuleV1:
         self.buf = ReplayBuffer(args)
 
         # initialize logger
-        # TODO change entity to flybyml
-        wandb.init(project=args.project, name=args.run)
+        wandb.init(project=args.project, name=args.run, entity="flybyml")
         wandb.config = args
         wandb.watch(self.policy)
 
+        # configure model checkpoint save root
+        self.ckpt_root = Path(os.path.dirname(__file__)) / "../" / args.project / "logs" / args.run
+        os.makedirs(self.ckpt_root, exist_ok=True)
     
     def construct_observation(self, step: int, cur_state: PlaneState, prev_state: PlaneState, objective) -> Tensor:
         """
@@ -338,6 +342,52 @@ class DDPGModuleV1:
             'pi_loss': pi_loss.item()
         }
 
+
+    def test(self, global_step):
+        test_return = 0
+        with torch.no_grad():
+            alt, heading, spd = sample_state()
+            state, self.control = self.env.reset(0, 0, alt, heading, spd, 40000, pause=True)
+            prev_state = state
+            self.init_step = 0
+            self.init_state = state
+
+            # construct objective
+            # add buffer when sampling objective so that the agent has space to explore
+            # key -> Tuple[objective value, intensity]
+            objective = {
+                'pitch': (random.uniform(MIN_PITCH+5, MAX_PITCH-5), random.random()),
+                'roll': (random.uniform(MIN_ROLL+10, MAX_ROLL-10), random.random()),
+                'spd': (random.uniform(MIN_SPD+kts_to_mps(30), MAX_SPD-kts_to_mps(30)), random.random()),
+            }
+
+            for step in tqdm(range(self.args.train.test_n_steps)):
+                obs = self.construct_observation(step, state, prev_state, objective)
+                act = self.policy.act(obs)
+                self.update_control(act)
+                next_state = self.env.rl_step(self.control, self.args.step_interval)
+
+                rew = self.construct_reward(obs)
+                test_return += rew
+
+                prev_state = state
+                state = next_state
+        # check if we should save the model or not
+        save = True
+        if len(os.listdir(self.ckpt_root)) > 0:
+            original_name = os.listdir(self.ckpt_root)[0]
+            original_return = float(original_name.split(".")[0].split("reward=")[1])
+            if original_return >= test_return:
+                save = False
+            if save:
+                os.remove(self.ckpt_root / original_name)
+        if save:
+            torch.save(self.policy.state_dict(), self.ckpt_root / f"reward={test_return}.ckpt")
+        
+        # log
+        wandb.log({
+            'test_return': test_return
+        }, step=global_step)
     
     def train(self):
         done = True
@@ -388,6 +438,10 @@ class DDPGModuleV1:
                 for _ in range(self.args.train.update_every):
                     logs = self.update()
                     wandb.log(logs, step=step)
+            
+            if step % self.args.train.test_every == 0:
+                self.test(global_step=step)
+                done = True
 
             prev_state = state
             state = next_state

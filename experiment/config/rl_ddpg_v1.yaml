@@ -10,8 +10,10 @@ train:
   rew_scale: 1.0
   replay_size: 1000000
   max_ep_len: 600
-  update_after: 1 # 1000
+  update_after: 1000
   update_every: 50
+  test_every: 5000
+  test_n_steps: 100
   pi_lr: 0.001
   q_lr: 0.001
   d_factor: 0.99
