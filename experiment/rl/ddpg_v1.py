@@ -5,9 +5,11 @@ Training Objective:
 
 import random
 import torch
+import wandb
 import torch.nn as nn
 import numpy as np
 
+from tqdm import tqdm
 from copy import deepcopy
 from torch import Tensor
 from torch.distributions.normal import Normal
@@ -207,6 +209,12 @@ class DDPGModuleV1:
         # replay buffer
         self.buf = ReplayBuffer(args)
 
+        # initialize logger
+        # TODO change entity to flybyml
+        wandb.init(project=args.project, name=args.run)
+        wandb.config = args
+        wandb.watch(self.policy)
+
     
     def construct_observation(self, step: int, cur_state: PlaneState, prev_state: PlaneState, objective) -> Tensor:
         """
@@ -303,7 +311,7 @@ class DDPGModuleV1:
         q_loss = ((q-bellman_backup)**2).mean()
         q_loss.backward()
         self.q_optim.step()
-
+        
         # 2. optimize pi policy network
         for p in self.policy.q.parameters():
             p.requires_grad = False
@@ -322,11 +330,18 @@ class DDPGModuleV1:
             for policy_p, target_p in zip(self.policy.parameters(), self.target.parameters()):
                 target_p.data.mul_(self.args.train.polyak)
                 target_p.data.add_((1-self.args.train.polyak) * policy_p.data)
+        
+        # return log
+        return {
+            'q_value': q.mean().item(),
+            'q_loss': q_loss.item(),
+            'pi_loss': pi_loss.item()
+        }
 
     
     def train(self):
         done = True
-        for step in range(self.args.train.total_steps):
+        for step in tqdm(range(self.args.train.total_steps)):
             #  reset environment with newly sampled weather etc.
             if done:
                 alt, heading, spd = sample_state()
@@ -371,7 +386,8 @@ class DDPGModuleV1:
             # update
             if step >= self.args.train.update_after and step % self.args.train.update_every == 0:
                 for _ in range(self.args.train.update_every):
-                    self.update()
+                    logs = self.update()
+                    wandb.log(logs, step=step)
 
             prev_state = state
             state = next_state

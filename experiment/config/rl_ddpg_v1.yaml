@@ -5,12 +5,12 @@ step_interval: 0.1
 train:
   batch_size: 32
   total_steps: 100000000
-  start_steps: 1000 # TODO needs to be changed to a larger value
+  start_steps: 10000  # number of steps of random actions taken for exploration
   act_noise: 0.1
   rew_scale: 1.0
   replay_size: 1000000
   max_ep_len: 600
-  update_after: 1000
+  update_after: 1 # 1000
   update_every: 50
   pi_lr: 0.001
   q_lr: 0.001
