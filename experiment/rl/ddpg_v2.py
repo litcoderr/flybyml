@@ -27,12 +27,12 @@ MIN_ALT = ft_to_me(15000)
 MAX_ALT = ft_to_me(25000)
 MIN_HEADING = 0
 MAX_HEADING = 360
-MIN_SPD = kts_to_mps(160)
+MIN_SPD = kts_to_mps(230)
 MAX_SPD = kts_to_mps(300)
-MIN_PITCH = -25
-MAX_PITCH = 25
-MIN_ROLL = -40
-MAX_ROLL = 40
+MIN_PITCH = -15
+MAX_PITCH = 15
+MIN_ROLL = -25
+MAX_ROLL = 25
 
 # normalizing constant
 PITCH_NORM = 180
@@ -43,11 +43,10 @@ SPD_NORM = kts_to_mps(300)
 # Tupe[min_freq, max_freq]  (unit corresponds to its key's unit)
 # freq = change of unit per sec
 FREQ = {
-    'pitch': (2, 20),
-    'roll': (2, 20),
+    'pitch': (2, 10),
+    'roll': (2, 10),
     'spd': (kts_to_mps(5), kts_to_mps(10))
 }
-
 
 def sample_state():
     """
@@ -56,14 +55,10 @@ def sample_state():
         heading: sampled heading
         spd: sampled spd
     """
-    alt = random.uniform(MIN_ALT, MAX_ALT)
+    alt = MAX_ALT
     heading = random.uniform(MIN_HEADING, MAX_HEADING)
-    spd = random.uniform(kts_to_mps(210), MAX_SPD-kts_to_mps(30))
+    spd = kts_to_mps(300)
     return alt, heading, spd
-
-
-def is_boundary(state: PlaneState):
-    return state.pos.alt >= MIN_ALT and state.pos.alt <= MAX_ALT
 
 
 def clip(v, min_v, max_v):
@@ -188,7 +183,7 @@ class ReplayBuffer:
         )
 
 
-class DDPGModuleV1:
+class DDPGModuleV2:
     def __init__(self, args):
         self.args = args
 
@@ -296,10 +291,8 @@ class DDPGModuleV1:
             observation: Tensor [e_pitch, e_roll, e_spd, traj_pitch, traj_roll, traj_spd, d_roll, d_pitch, d_spd, i_roll, i_pitch, i_spd]
         """
         # reward distribution
-        # TODO decrease scale(sigma) as timestep increases, to give mroe intense reward towards the end of episode
-        scale = self.args.train.rew_scale
-        normal = Normal(torch.tensor([0, 0, 0]).to(self.args.device), torch.tensor([scale, scale, scale]).to(self.args.device))
-        rewards = torch.exp(normal.log_prob(obs[3:6]))
+        normal = Normal(torch.tensor([0, 0, 0]).to(self.args.device), torch.tensor(self.args.train.rew_scale).to(self.args.device))
+        rewards = torch.exp(normal.log_prob(obs[3:6])) - 0.7
         return torch.sum(rewards)
     
     def update(self):
@@ -346,19 +339,18 @@ class DDPGModuleV1:
     def test(self, global_step):
         test_return = 0
         with torch.no_grad():
-            alt, heading, spd = sample_state()
-            state, self.control = self.env.reset(0, 0, alt, heading, spd, 40000, pause=True)
+            init_alt, init_heading, init_spd = sample_state()
+            state, self.control = self.env.reset(0, 0, init_alt, init_heading, init_spd, 40000, pause=True)
             prev_state = state
             self.init_step = 0
             self.init_state = state
 
             # construct objective
-            # add buffer when sampling objective so that the agent has space to explore
             # key -> Tuple[objective value, intensity]
             objective = {
-                'pitch': (random.uniform(MIN_PITCH+5, MAX_PITCH-5), random.random()),
-                'roll': (random.uniform(MIN_ROLL+10, MAX_ROLL-10), random.random()),
-                'spd': (random.uniform(MIN_SPD+kts_to_mps(30), MAX_SPD-kts_to_mps(30)), random.random()),
+                'pitch': (random.uniform(MIN_PITCH, MAX_PITCH), random.random()),
+                'roll': (random.uniform(MIN_ROLL, MAX_ROLL), random.random()),
+                'spd': (random.uniform(MIN_SPD, MAX_SPD), random.random()),
             }
 
             for step in tqdm(range(self.args.train.test_n_steps)):
@@ -391,23 +383,24 @@ class DDPGModuleV1:
     
     def train(self):
         done = True
-        for step in tqdm(range(self.args.train.total_steps)):
+        pbar = tqdm(range(self.args.train.total_steps))
+        for step in pbar:
             #  reset environment with newly sampled weather etc.
             if done:
-                alt, heading, spd = sample_state()
-                state, self.control = self.env.reset(0, 0, alt, heading, spd, 40000, pause=True)
+                init_alt, init_heading, init_spd = sample_state()
+                state, self.control = self.env.reset(0, 0, init_alt, init_heading, init_spd, 40000, pause=True)
                 prev_state = state
                 self.init_step = step
                 self.init_state = state
 
                 # construct objective
-                # add buffer when sampling objective so that the agent has space to explore
                 # key -> Tuple[objective value, intensity]
                 objective = {
-                    'pitch': (random.uniform(MIN_PITCH+5, MAX_PITCH-5), random.random()),
-                    'roll': (random.uniform(MIN_ROLL+10, MAX_ROLL-10), random.random()),
-                    'spd': (random.uniform(MIN_SPD+kts_to_mps(30), MAX_SPD-kts_to_mps(30)), random.random()),
+                    'pitch': (random.uniform(MIN_PITCH, MAX_PITCH), random.random()),
+                    'roll': (random.uniform(MIN_ROLL, MAX_ROLL), random.random()),
+                    'spd': (random.uniform(MIN_SPD, MAX_SPD), random.random()),
                 }
+                pbar.set_description(f"rel_step: {step - self.init_step}|obj: {objective}")
             obs = self.construct_observation(step, state, prev_state, objective)
 
             # take a step in the environment
@@ -425,7 +418,7 @@ class DDPGModuleV1:
             next_obs = self.construct_observation(step+1, next_state, state, objective)
 
             # handle end of episode
-            done = not is_boundary(next_state) or (step - self.init_step) >= self.args.train.max_ep_len
+            done = (step - self.init_step) >= self.args.train.max_ep_len
 
             # calculate reward
             rew = self.construct_reward(obs)

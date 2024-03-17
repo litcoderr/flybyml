@@ -14,7 +14,7 @@ from experiment.baseline.without_vis import AlfredBaselineWithoutVis
 from experiment.baseline.teacher_force import AlfredBaselineTeacherForce
 from experiment.simple_fc.base import FCBaseline
 from experiment.simple_fc.batch_normalize import FCBaselineBatchNormalize
-from experiment.rl.ddpg_v1 import DDPGModuleV1
+from experiment.rl.ddpg_v2 import DDPGModuleV2
 
 cur_dir = Path(os.path.dirname(__file__)) 
 
@@ -43,7 +43,7 @@ PL_MODULE = {
 }
 
 RL_MODULE = {
-    'ddpg_v1': DDPGModuleV1
+    'ddpg_v2': DDPGModuleV2
 }
 
 def main(args):

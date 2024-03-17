@@ -157,10 +157,10 @@ class API(object):
 
     def init_ctrl(self):
         init_ctrl = Controls(
-            elev = 0,
+            elev = -0.3,
             ail = 0,
             rud = 0,
-            thr = 0.5,
+            thr = 1,
             gear = 0,
             flaps = 0,
             trim = 0,

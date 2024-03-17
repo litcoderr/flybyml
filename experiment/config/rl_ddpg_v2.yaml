@@ -1,5 +1,5 @@
 project: rl
-run: ddpg_v1
+run: ddpg_v2
 device: cuda
 step_interval: 0.1
 train:
@@ -7,15 +7,15 @@ train:
   total_steps: 100000000
   start_steps: 10000  # number of steps of random actions taken for exploration
   act_noise: 0.1
-  rew_scale: 1.0
+  rew_scale: [0.2, 0.2, 0.2]
   replay_size: 1000000
-  max_ep_len: 600
+  max_ep_len: 300
   update_after: 1000
   update_every: 50
   test_every: 5000
   test_n_steps: 100
-  pi_lr: 0.001
-  q_lr: 0.001
+  pi_lr: 0.00001
+  q_lr: 0.0001
   d_factor: 0.99
   polyak: 0.995
 model:
