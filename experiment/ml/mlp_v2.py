@@ -9,15 +9,21 @@ from pathlib import Path
 from lightning import LightningModule
 from matplotlib import pyplot as plt
 
-class MLPV1(nn.Module):
+class MLPV2(nn.Module):
     def __init__(self, args):
         super().__init__()
 
-        self.fc1 = nn.Linear(args.dsensory, 32)
-        self.bn1 = nn.BatchNorm1d(32)
-        self.fc2 = nn.Linear(32, 16)
-        self.bn2 = nn.BatchNorm1d(16)
-        self.fc3 = nn.Linear(16, 3)
+        self.fc1 = nn.Linear(args.dsensory, 16)
+        self.bn1 = nn.BatchNorm1d(16)
+        self.fc2 = nn.Linear(16, 32)
+        self.bn2 = nn.BatchNorm1d(32)
+        self.fc3 = nn.Linear(32, 64)
+        self.bn3 = nn.BatchNorm1d(64)
+        self.fc4 = nn.Linear(64, 32)
+        self.bn4 = nn.BatchNorm1d(32)
+        self.fc5 = nn.Linear(32, 16)
+        self.bn5 = nn.BatchNorm1d(16)
+        self.fc6 = nn.Linear(16, 3)
         self.relu = nn.ReLU()
         self.sigmoid = nn.Sigmoid()
 
@@ -31,25 +37,36 @@ class MLPV1(nn.Module):
         Returns:
             torch.Tensor: predicted actions (elev, ail, thr) for batch
         """
-        # [b, 32]
+        # [b, 16]
         x = self.fc1(x)
         x = self.bn1(x)
         x = self.relu(x)
-        # [b, 16]
+        # [b, 32]
         x = self.fc2(x)
         x = self.bn2(x)
         x = self.relu(x)
-        # [b, 3]
+        # [b, 64]
         x = self.fc3(x)
+        x = self.bn3(x)
+        x = self.relu(x)
+        # [b, 32]
+        x = self.fc4(x)
+        x = self.bn4(x)
+        x = self.relu(x)
+        # [b, 16]
+        x = self.fc5(x)
+        x = self.bn5(x)
+        x = self.relu(x)
+        # [b, 3]
+        x = self.fc6(x)
         x = self.sigmoid(x)
         return x
-
-
-class MLPModuleV1(LightningModule):
+    
+class MLPModuleV2(LightningModule):
     def __init__(self, args):
         super().__init__()
         self.args = args
-        self.model = MLPV1(args.model)
+        self.model = MLPV2(args.model)
         self.mse = nn.MSELoss()
 
         # auto-logged by W&B

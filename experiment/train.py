@@ -10,12 +10,15 @@ from lightning.pytorch.callbacks import ModelCheckpoint
 from dataset.baseline import BaselineDataModule
 from dataset.simple_fc import FCBaselineDataModule
 from dataset.ml_subprob import MPCDataModule
+from dataset.ml_subprob_recurrent import MPCRecurrentDataModule
 from experiment.baseline.baseline import AlfredBaseline
 from experiment.baseline.without_vis import AlfredBaselineWithoutVis
 from experiment.baseline.teacher_force import AlfredBaselineTeacherForce
 from experiment.simple_fc.base import FCBaseline
 from experiment.simple_fc.batch_normalize import FCBaselineBatchNormalize
 from experiment.ml.mlp_v1 import MLPModuleV1
+from experiment.ml.mlp_v2 import MLPModuleV2
+from experiment.ml.lstm_v1 import LSTMModuleV1
 from experiment.rl.ddpg_v1 import DDPGModuleV1
 
 cur_dir = Path(os.path.dirname(__file__)) 
@@ -32,6 +35,8 @@ DATA_MODULE = {
     },
     'ml': {
         'mlp_v1': MPCDataModule,
+        'mlp_v2': MPCDataModule,
+        'lstm_v1': MPCRecurrentDataModule,
     }
 }
 
@@ -46,7 +51,9 @@ PL_MODULE = {
         'batch_normalize': FCBaselineBatchNormalize,
     },
     'ml': {
-        'mlp_v1': MLPModuleV1
+        'mlp_v1': MLPModuleV1,
+        'mlp_v2': MLPModuleV2,
+        'lstm_v1': LSTMModuleV1,
     }
 }
 
