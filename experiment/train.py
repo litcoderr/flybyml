@@ -9,11 +9,13 @@ from lightning.pytorch.callbacks import ModelCheckpoint
 
 from dataset.baseline import BaselineDataModule
 from dataset.simple_fc import FCBaselineDataModule
+from dataset.ml_subprob import MPCDataModule
 from experiment.baseline.baseline import AlfredBaseline
 from experiment.baseline.without_vis import AlfredBaselineWithoutVis
 from experiment.baseline.teacher_force import AlfredBaselineTeacherForce
 from experiment.simple_fc.base import FCBaseline
 from experiment.simple_fc.batch_normalize import FCBaselineBatchNormalize
+from experiment.ml.mlp_v1 import MLPModuleV1
 from experiment.rl.ddpg_v1 import DDPGModuleV1
 
 cur_dir = Path(os.path.dirname(__file__)) 
@@ -27,6 +29,9 @@ DATA_MODULE = {
     'simple_fc': {
         'base': FCBaselineDataModule,
         'batch_normalize': FCBaselineDataModule,
+    },
+    'ml': {
+        'mlp_v1': MPCDataModule,
     }
 }
 
@@ -39,6 +44,9 @@ PL_MODULE = {
     'simple_fc': {
         'base': FCBaseline,
         'batch_normalize': FCBaselineBatchNormalize,
+    },
+    'ml': {
+        'mlp_v1': MLPModuleV1
     }
 }
 
