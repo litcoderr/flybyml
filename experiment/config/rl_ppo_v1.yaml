@@ -7,5 +7,5 @@ train:
   steps_per_epoch: 4000
   batch_size: 32
 model:
-  obs_dim: 12 # [e_pitch, e_roll, e_spd, traj_pitch, traj_roll, traj_spd, d_roll, d_pitch, d_spd, i_roll, i_pitch, i_spd]
-  act_dim: 3 # [d_elev, d_ail, d_thrust]
+  obs_dim: 4 # [e_pitch, e_bank, d_pitch, d_bank]
+  act_dim: 2 # [elev, ail]
