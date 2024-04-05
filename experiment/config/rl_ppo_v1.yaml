@@ -5,7 +5,7 @@ step_interval: 0.1  # time interval between steps (sec)
 done_buf_size: 100
 train:
   epoch: 10000
-  steps_per_epoch: 1 # 4000
+  steps_per_epoch: 2 # 4000
   max_ep_len: 1 # 200
   gamma: 0.99
   lam: 0.95

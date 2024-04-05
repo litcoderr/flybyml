@@ -7,6 +7,7 @@ using Proximal Policy Optimization
 from typing import Tuple, Optional
 
 import torch
+import wandb
 import scipy
 import random
 import torch.nn as nn
@@ -24,26 +25,6 @@ from util import ft_to_me, kts_to_mps
 
 
 FIXED_THR_VAL = 0.8
-
-
-def construct_observation(state: PlaneState, prev_state: PlaneState, objective, device):
-    """
-    construct observation based on current state and prev states
-
-    Return:
-        observation: Tensor [e_pitch, e_roll, e_spd, traj_pitch, traj_roll, traj_spd, d_roll, d_pitch, d_spd, i_roll, i_pitch, i_spd]
-            e_: stands for error
-            traj_: stands for trajectory error
-            d_: stands for delta
-            i_: stands for intensty [0-1]
-    """
-    # every value is normalized
-    # TODO delta should be better defined and normalized. As of now, delta's value is dependant on timestep
-    error = torch.tensor([(state.att.pitch - objective['pitch']) / 180,
-                          (state.att.roll - objective['roll']) / 180])
-    delta = torch.tensor([(state.att.pitch - prev_state.att.pitch) / 180,
-                          (state.att.roll - prev_state.att.roll) / 180])
-    return torch.cat([error, delta]).to(device)
 
 
 def construct_reward(obs: Tensor) -> float:
@@ -209,6 +190,36 @@ class PPOBuffer:
         }
 
 
+class Logger:
+    def __init__(self):
+        self.epoch_dict = dict()
+        self.log_dict = dict()
+    
+    def add(self, **kwargs):
+        for k, v in kwargs.items():
+            if not (k in self.epoch_dict.keys()):
+                self.epoch_dict[k] = []
+            self.epoch_dict[k].append(v)
+    
+    def flush(self):
+        wandb.log(self.log_dict)
+        self.log_dict = dict()
+    
+    def log(self, key, with_min_max = False, average_only = False):
+        mean = np.mean(self.epoch_dict[key])
+
+        if average_only:
+            self.log_dict[key] = mean
+        else:
+            std = np.std(self.epoch_dict[key])
+            self.log_dict['Mean_'+key] = mean
+            self.log_dict['Std_'+key] = std
+        
+        if with_min_max:
+            self.log_dict['Min_'+key] = np.min(self.epoch_dict[key])
+            self.log_dict['Max_'+key] = np.max(self.epoch_dict[key])
+
+
 class PPOModuleV1:
     def __init__(self, args):
         self.args = args
@@ -222,6 +233,12 @@ class PPOModuleV1:
 
         self.pi_optim = Adam(self.model.pi.parameters(), lr=args.train.pi_lr)
         self.v_optim = Adam(self.model.v.parameters(), lr=args.train.v_lr)
+
+        #wandb.init(project=args.project, name=args.run, config=dict(args), entity="flybyml")
+        wandb.init(project=args.project, name=args.run, config=dict(args))
+        wandb.watch(self.model)
+        self.logger = Logger()
+
     
     def reset_env(self) -> Tuple[PlaneState, PlaneState]:
         """
@@ -242,7 +259,18 @@ class PPOModuleV1:
             prev_state = state
             state = self.env.rl_step(control, self.args.step_interval)
         return state, prev_state
-    
+
+    def construct_observation(self, state: PlaneState, prev_state: PlaneState, objective, device):
+        """
+        construct observation based on current state and prev states
+        """
+        # every value is normalized
+        error = torch.tensor([(state.att.pitch - objective['pitch']) / 180,
+                            (state.att.roll - objective['roll']) / 180])
+        delta = torch.tensor([(state.att.pitch - prev_state.att.pitch) * self.args.step_interval / 180,
+                            (state.att.roll - prev_state.att.roll) * self.args.step_interval / 180])
+        return torch.cat([error, delta]).to(device)
+
     def compute_loss_pi(self, data) -> Tensor:
         obs, act, adv, logp_old = data['obs'], data['act'], data['adv'], data['logp']
 
@@ -272,7 +300,7 @@ class PPOModuleV1:
         v_loss_old = self.compute_loss_v(data).item()
 
         # optimize pi
-        for _ in range(self.args.train.pi_iters):
+        for pi_update_idx in range(self.args.train.pi_iters):
             self.pi_optim.zero_grad()
             pi_loss, pi_info = self.compute_loss_pi(data)
             if pi_info['kl'] > 1.5 * self.args.train.target_kl:
@@ -288,6 +316,16 @@ class PPOModuleV1:
             v_loss.backward()
             self.v_optim.step()
 
+        self.logger.add(
+            StopIter = pi_update_idx,
+            LossPi = pi_loss_old,
+            LossV = v_loss_old,
+            KL = pi_info['kl'],
+            Entropy = pi_info['ent'],
+            ClipFrac = pi_info['cf'],
+            DeltaLossPi = (pi_loss.item() - pi_loss_old),
+            DeltaLossV = (v_loss.item() - v_loss_old)
+        )
 
     def train(self):
         state, prev_state = self.reset_env()
@@ -295,14 +333,14 @@ class PPOModuleV1:
         ep_len = 0  # current episode's step
         for epoch in tqdm(range(self.args.train.epoch), desc='epoch'):
             for local_step in tqdm(range(self.args.train.steps_per_epoch), desc='local step'):
-                obs = construct_observation(state, prev_state, self.obj, self.args.device)
+                obs = self.construct_observation(state, prev_state, self.obj, self.args.device)
                 
                 # sample action, value, log probability of action
                 action, value, log_prob = self.model.step(obs)
 
                 # take env step using sampled action
                 next_state = self.env.rl_step(act_to_control(action), self.args.step_interval)
-                next_obs = construct_observation(next_state, state, self.obj, 'cpu')
+                next_obs = self.construct_observation(next_state, state, self.obj, 'cpu')
 
                 # calculate reward by taking this action
                 rew = construct_reward(next_obs)
@@ -311,6 +349,7 @@ class PPOModuleV1:
 
                 # save to buffer for training
                 self.buf.store(obs.cpu().numpy(), action, rew, value, log_prob)
+                self.logger.add(Vals=value)
 
                 # update state and prev_state
                 prev_state = state
@@ -319,11 +358,11 @@ class PPOModuleV1:
                 episode_ended = ep_len == self.args.train.max_ep_len
                 epoch_ended = local_step == self.args.train.steps_per_epoch -1
                 if episode_ended or epoch_ended:
-                    obs = construct_observation(state, prev_state, self.obj, self.args.device)
+                    obs = self.construct_observation(state, prev_state, self.obj, self.args.device)
                     _, value, _ = self.model.step(obs)
                     self.buf.finish_path(value)
 
-                    # TODO log episodic return only if episode ended
+                    self.logger.add(EpRet=ep_ret)
 
                     ep_ret = 0
                     ep_len = 0
@@ -331,3 +370,16 @@ class PPOModuleV1:
 
             # finished an epoch
             self.update()
+
+            # log
+            self.logger.log('Vals', with_min_max=True)
+            self.logger.log('EpRet', with_min_max=True)
+            self.logger.log('StopIter', average_only=True)
+            self.logger.log('LossPi', average_only=True)
+            self.logger.log('LossV', average_only=True)
+            self.logger.log('KL', average_only=True)
+            self.logger.log('Entropy', average_only=True)
+            self.logger.log('ClipFrac', average_only=True)
+            self.logger.log('DeltaLossPi', average_only=True)
+            self.logger.log('DeltaLossV', average_only=True)
+            self.logger.flush()
