@@ -12,6 +12,9 @@ train:
   clip_ratio: 0.2
   pi_iters: 80
   v_iters: 80
+  pi_lr: 0.0003
+  v_lr: 0.001
+  target_kl: 0.01
 model:
   obs_dim: 4 # [e_pitch, e_bank, d_pitch, d_bank]
   act_dim: 2 # [elev, ail]

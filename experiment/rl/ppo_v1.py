@@ -12,10 +12,10 @@ import random
 import torch.nn as nn
 import numpy as np
 
-from torch import Tensor
 from tqdm import tqdm
+from torch import Tensor
+from torch.optim import Adam
 from torch.distributions.normal import Normal
-from mpi4py import MPI
 
 from controls import Controls
 from environment import XplaneEnvironment
@@ -67,45 +67,9 @@ def act_to_control(act: np.array) -> Controls:
         thr=FIXED_THR_VAL
     )
 
+
 def discount_cumsum(x, discount):
     return scipy.signal.lfilter([1], [1, float(-discount)], x[::-1], axis=0)[::-1]
-
-
-def mpi_op(x, op):
-    x, scalar = ([x], True) if np.isscalar(x) else (x, False)
-    x = np.asarray(x, dtype=np.float32)
-    buff = np.zeros_like(x, dtype=np.float32)
-    MPI.COMM_WORLD.Allreduce(x, buff, op=op)
-    return buff[0] if scalar else buff
-
-
-def mpi_sum(x):
-    return mpi_op(x, MPI.SUM)
-
-
-def mpi_statistics_scalar(x, with_min_and_max=False):
-    """
-    Get mean/std and optional min/max of scalar x across MPI processes.
-
-    Args:
-        x: An array containing samples of the scalar to produce statistics
-            for.
-
-        with_min_and_max (bool): If true, return min and max of x in 
-            addition to mean and std.
-    """
-    x = np.array(x, dtype=np.float32)
-    global_sum, global_n = mpi_sum([np.sum(x), len(x)])
-    mean = global_sum / global_n
-
-    global_sum_sq = mpi_sum(np.sum((x - mean)**2))
-    std = np.sqrt(global_sum_sq / global_n)  # compute global std
-
-    if with_min_and_max:
-        global_min = mpi_op(np.min(x) if len(x) > 0 else np.inf, op=MPI.MIN)
-        global_max = mpi_op(np.max(x) if len(x) > 0 else -np.inf, op=MPI.MAX)
-        return mean, std, global_min, global_max
-    return mean, std
 
 
 class Actor(nn.Module):
@@ -230,8 +194,7 @@ class PPOBuffer:
         self.ptr, self.path_start_idx = 0, 0
 
         # advantage normalization
-        # TODO delete redundant mpi statistics code
-        adv_mean, adv_std = mpi_statistics_scalar(self.adv_buf)
+        adv_mean, adv_std = np.mean(self.adv_buf),  np.std(self.adv_buf)
         self.adv_buf = (self.adv_buf - adv_mean) / adv_std
 
         data = dict(
@@ -256,6 +219,9 @@ class PPOModuleV1:
         }
         self.model = ActorCritic(args).to(self.args.device)
         self.buf = PPOBuffer(args)
+
+        self.pi_optim = Adam(self.model.pi.parameters(), lr=args.train.pi_lr)
+        self.v_optim = Adam(self.model.v.parameters(), lr=args.train.v_lr)
     
     def reset_env(self) -> Tuple[PlaneState, PlaneState]:
         """
@@ -305,14 +271,23 @@ class PPOModuleV1:
         pi_loss_old = pi_loss_old.item()
         v_loss_old = self.compute_loss_v(data).item()
 
+        # optimize pi
         for _ in range(self.args.train.pi_iters):
-            # TODO we do not need MPI since we cannot run multiple simulations at the same time
-            pass
+            self.pi_optim.zero_grad()
+            pi_loss, pi_info = self.compute_loss_pi(data)
+            if pi_info['kl'] > 1.5 * self.args.train.target_kl:
+                # Early stopping due to reaching max kl
+                break
+            pi_loss.backward()
+            self.pi_optim.step()
         
+        # optimize v
         for _ in range(self.args.train.v_iters):
-            pass
+            self.v_optim.zero_grad()
+            v_loss = self.compute_loss_v(data)
+            v_loss.backward()
+            self.v_optim.step()
 
-        # TODO
 
     def train(self):
         state, prev_state = self.reset_env()
@@ -334,7 +309,7 @@ class PPOModuleV1:
                 ep_ret += rew
                 ep_len += 1
 
-                # TODO save to buffer for training
+                # save to buffer for training
                 self.buf.store(obs.cpu().numpy(), action, rew, value, log_prob)
 
                 # update state and prev_state
