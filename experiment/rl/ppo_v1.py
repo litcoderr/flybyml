@@ -6,6 +6,7 @@ using Proximal Policy Optimization
 """
 from typing import Tuple, Optional
 
+import os
 import torch
 import wandb
 import scipy
@@ -13,6 +14,7 @@ import random
 import torch.nn as nn
 import numpy as np
 
+from pathlib import Path
 from tqdm import tqdm
 from torch import Tensor
 from torch.optim import Adam
@@ -203,6 +205,7 @@ class Logger:
     
     def flush(self):
         wandb.log(self.log_dict)
+        self.epoch_dict = dict()
         self.log_dict = dict()
     
     def log(self, key, with_min_max = False, average_only = False):
@@ -234,10 +237,14 @@ class PPOModuleV1:
         self.pi_optim = Adam(self.model.pi.parameters(), lr=args.train.pi_lr)
         self.v_optim = Adam(self.model.v.parameters(), lr=args.train.v_lr)
 
-        #wandb.init(project=args.project, name=args.run, config=dict(args), entity="flybyml")
-        wandb.init(project=args.project, name=args.run, config=dict(args))
+        wandb.init(project=args.project, name=args.run, config=dict(args), entity="flybyml")
+        #wandb.init(project=args.project, name=args.run, config=dict(args))
         wandb.watch(self.model)
         self.logger = Logger()
+
+        # configure model checkpoint save root
+        self.ckpt_root = Path(os.path.dirname(__file__)) / "../" / args.project / "logs" / args.run
+        os.makedirs(self.ckpt_root, exist_ok=True)
 
     
     def reset_env(self) -> Tuple[PlaneState, PlaneState]:
@@ -370,6 +377,17 @@ class PPOModuleV1:
 
             # finished an epoch
             self.update()
+
+            save = True
+            current_return = np.mean(self.logger.epoch_dict['EpRet'])
+            if len(os.listdir(self.ckpt_root)) > 0:
+                original_name = os.listdir(self.ckpt_root)[0]
+                past_return = float(original_name.split(".")[0].split("EpRet=")[1])
+                save = current_return > past_return
+                if save:
+                    os.remove(self.ckpt_root / original_name)
+            if save:
+                torch.save(self.policy.state_dict(), self.ckpt_root / f"EpRet={current_return}.ckpt")
 
             # log
             self.logger.log('Vals', with_min_max=True)
