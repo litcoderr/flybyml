@@ -387,7 +387,7 @@ class PPOModuleV1:
                 if save:
                     os.remove(self.ckpt_root / original_name)
             if save:
-                torch.save(self.policy.state_dict(), self.ckpt_root / f"EpRet={current_return}.ckpt")
+                torch.save(self.model.state_dict(), self.ckpt_root / f"EpRet={current_return}.ckpt")
 
             # log
             self.logger.log('Vals', with_min_max=True)
