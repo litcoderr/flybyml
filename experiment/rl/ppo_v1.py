@@ -7,6 +7,7 @@ using Proximal Policy Optimization
 from typing import Tuple, Optional
 
 import os
+from omegaconf import OmegaConf
 import torch
 import wandb
 import scipy
@@ -123,6 +124,10 @@ class ActorCritic(nn.Module):
             value = self.v(obs)
         return act.cpu().numpy(), value.cpu().numpy(), log_prob.cpu().numpy()
 
+    def infer(self, obs: Tensor):
+        with torch.no_grad():
+            dist = self.pi.get_distribution(obs)
+        return dist.loc
 
 class PPOBuffer:
     def __init__(self, args):
@@ -224,27 +229,30 @@ class Logger:
 
 
 class PPOModuleV1:
-    def __init__(self, args):
+    def __init__(self, args, train=True, ckpt_path=None):
         self.args = args
         self.env = XplaneEnvironment(agent=None)
         self.obj = {
             'pitch': 0,
             'roll': 0
         }
-        self.model = ActorCritic(args).to(self.args.device)
+        self.model = ActorCritic(args)
+        if ckpt_path is not None:
+            self.model.load_state_dict(torch.load(ckpt_path))
+        self.model = self.model.to(self.args.device)
         self.buf = PPOBuffer(args)
 
         self.pi_optim = Adam(self.model.pi.parameters(), lr=args.train.pi_lr)
         self.v_optim = Adam(self.model.v.parameters(), lr=args.train.v_lr)
 
-        wandb.init(project=args.project, name=args.run, config=dict(args), entity="flybyml")
-        #wandb.init(project=args.project, name=args.run, config=dict(args))
-        wandb.watch(self.model)
-        self.logger = Logger()
-
-        # configure model checkpoint save root
-        self.ckpt_root = Path(os.path.dirname(__file__)) / "../" / args.project / "logs" / args.run
-        os.makedirs(self.ckpt_root, exist_ok=True)
+        if train:
+            # init wandb logger
+            wandb.init(project=args.project, name=args.run, config=dict(args), entity="flybyml")
+            wandb.watch(self.model)
+            self.logger = Logger()
+            # configure model checkpoint save root
+            self.ckpt_root = Path(os.path.dirname(__file__)) / "../" / args.project / "logs" / args.run
+            os.makedirs(self.ckpt_root, exist_ok=True)
 
     
     def reset_env(self) -> Tuple[PlaneState, PlaneState]:
@@ -334,6 +342,16 @@ class PPOModuleV1:
             DeltaLossV = (v_loss.item() - v_loss_old)
         )
 
+    def test(self):
+        state, prev_state = self.reset_env()
+        while True:
+            obs = self.construct_observation(state, prev_state, self.obj, self.args.device)
+            action = self.model.infer(obs)
+
+            prev_state = state
+            state = self.env.rl_step(act_to_control(action), self.args.step_interval)
+
+
     def train(self):
         state, prev_state = self.reset_env()
         ep_ret = 0  # episode return (cumulative value)
@@ -401,3 +419,11 @@ class PPOModuleV1:
             self.logger.log('DeltaLossPi', average_only=True)
             self.logger.log('DeltaLossV', average_only=True)
             self.logger.flush()
+
+if __name__ == "__main__":
+    conf = OmegaConf.load("C:/Users/lee/Desktop/ml/flybyml/experiment/config/rl_ppo_v1.yaml")
+    conf.merge_with_cli()
+
+    ckpt_path = "C:/Users/lee/Desktop/ml/flybyml/experiment/rl/logs/EpRet=191.80759536772968.ckpt"
+    model = PPOModuleV1(conf, ckpt_path=ckpt_path)
+    model.test()

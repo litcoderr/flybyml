@@ -2,7 +2,7 @@ import binascii
 import platform
 import socket
 import struct
-import xpc
+from XPlaneConnect.Python3.src import xpc
 
 from controls import Controls, Camera
 from state.att import Attitude
