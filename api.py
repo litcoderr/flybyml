@@ -186,7 +186,7 @@ class API(object):
             self.set_brake(controls.brake)
             self.set_speedbrake(controls.spd_brake)
             self.set_reverse_thrust(controls.reverse)
-            # self.set_camera(controls.camera)
+            self.set_camera(controls.camera)
     
     def get_ctrl(self) -> Controls:
         with xpc.XPlaneConnect() as client:

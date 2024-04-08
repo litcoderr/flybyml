@@ -138,7 +138,7 @@ if __name__ == "__main__":
         atc.start()
 
         # run simulation until end of session
-        prev_state: PlaneState = env.getState()
+        prev_state: PlaneState = env.get_state()
         buffer = []
         start_time = time.time()
         step_id = 0
