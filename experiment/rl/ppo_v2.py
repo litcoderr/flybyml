@@ -21,6 +21,7 @@ from tqdm import tqdm
 from torch import Tensor
 from torch.optim import Adam
 from torch.distributions.normal import Normal
+from torchvision.transforms import ToTensor
 
 from controls import Controls
 from environment import XplaneEnvironment
@@ -31,15 +32,17 @@ from util import ft_to_me, kts_to_mps
 
 FIXED_THR_VAL = 0.8
 
-def preprocess_video(frame_buf, shorten=True):
+def preprocess_video(ep_frames: list[np.array], shorten: bool=True) -> Tensor:
     frames = []
-    for frame in frame_buf:
-        frames.append(cv2.resize(frame, (250, 250), interpolation=cv2.INTER_AREA))
-    frames = np.array(frames)
+    toTensor = ToTensor()
+    for frame in ep_frames:
+        frame = cv2.resize(frame, (256, 256), interpolation=cv2.INTER_AREA)
+        frame = toTensor(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
+        frames.append(frame)
 
     if shorten:
         frames = frames[::4]
-    return frames
+    return torch.stack(frames).transpose(1, 0).unsqueeze(0)
 
 
 def construct_reward(obs: Tensor) -> float:
@@ -151,7 +154,6 @@ class PPOBuffer:
         self.ret_buf = np.zeros((args.train.steps_per_epoch), dtype=np.float32)
         self.val_buf = np.zeros((args.train.steps_per_epoch), dtype=np.float32)
         self.logp_buf = np.zeros((args.train.steps_per_epoch), dtype=np.float32)
-        self.frame_buf = np.zeros((args.train.steps_per_epoch, args.env.winsize[1], args.env.winsize[0], 4), dtype=np.uint8)
 
         self.gamma = args.train.gamma
         self.lam = args.train.lam
@@ -160,24 +162,22 @@ class PPOBuffer:
         self.path_start_idx = 0
         self.max_size = args.train.steps_per_epoch
     
-    def store(self, obs, act, rew, val, logp, frame):
+    def store(self, obs, act, rew, val, logp):
         assert self.ptr < self.max_size
         self.obs_buf[self.ptr] = obs
         self.act_buf[self.ptr] = act
         self.rew_buf[self.ptr] = rew
         self.val_buf[self.ptr] = val
         self.logp_buf[self.ptr] = logp
-        self.frame_buf[self.ptr] = frame
         self.ptr += 1
 
-    def finish_path(self, val, target_embedding):
+    def finish_path(self, val, rew):
         """
         End of trajectory.
         Calculate GAE-Lambda advantage and Return for this trajectory
         """
-
         path_slice = slice(self.path_start_idx, self.ptr)
-        rews = np.append(self.rew_buf[path_slice], val)
+        rews = np.append(self.rew_buf[path_slice], rew)
         vals = np.append(self.val_buf[path_slice], val)
 
         # calculate GAE-Lambda advantage
@@ -259,8 +259,6 @@ class PPOModuleV2:
         if ckpt_path is not None:
             self.model.load_state_dict(torch.load(ckpt_path))
         self.model = self.model.to(self.args.device)
-
-        OmegaConf.update(args, "env.winsize", self.env.get_window_size(), force_add=True)
         self.buf = PPOBuffer(args)
 
         self.pi_optim = Adam(self.model.pi.parameters(), lr=args.train.pi_lr)
@@ -271,9 +269,9 @@ class PPOModuleV2:
         self.s3d.load_state_dict(torch.load(args.s3d.pretrained))
         self.s3d = self.s3d.eval()
 
-        if args.demotype == "text":
-            text_output = self.text.text_module([args.demo])
-            self.target_embedding = text_output["text_embedding"]
+        if args.s3d.demotype == "text":
+            text_output = self.s3d.text_module([args.s3d.demo])["text_embedding"]
+            self.target_emb = text_output[0]
 
         if train:
             # init wandb logger
@@ -336,9 +334,15 @@ class PPOModuleV2:
     def compute_loss_v(self, data) -> Tensor:
         obs, ret = data['obs'], data['ret']
         return ((self.model.v(obs) - ret)**2).mean()
-    
-    def compute_sparse_reward():
-        pass
+
+    def construct_s3d_reward(self, ep_frames: list[np.array]) -> float:
+        """
+        compute similarity between demo (text/video) and current episode video
+        """
+        video = preprocess_video(ep_frames)
+        video_emb = self.s3d(video)["video_embedding"]
+
+        return torch.matmul(self.target_emb, video_emb.t()).item()
 
     def update(self):
         data = self.buf.get()
@@ -389,6 +393,7 @@ class PPOModuleV2:
         state, prev_state = self.reset_env()
         ep_ret = 0  # episode return (cumulative value)
         ep_len = 0  # current episode's step
+        ep_frames = []
         for epoch in tqdm(range(self.args.train.epoch), desc='epoch'):
             for local_step in tqdm(range(self.args.train.steps_per_epoch), desc='local step'):
                 obs = self.construct_observation(state, prev_state, self.obj, self.args.device)
@@ -398,12 +403,12 @@ class PPOModuleV2:
 
                 # take env step using sampled action
                 next_state = self.env.rl_step(act_to_control(action), self.args.step_interval)
-                frame = self.env.render()
+                ep_frames.append(self.env.render())
 
                 ep_len += 1
 
                 # save to buffer for training
-                self.buf.store(obs.cpu().numpy(), action, 0.0, value, log_prob, frame)
+                self.buf.store(obs.cpu().numpy(), action, 0.0, value, log_prob)
                 self.logger.add(Vals=value)
 
                 # update state and prev_state
@@ -415,8 +420,8 @@ class PPOModuleV2:
                 if episode_ended or epoch_ended:
                     obs = self.construct_observation(state, prev_state, self.obj, self.args.device)
                     _, value, _ = self.model.step(obs)
-                    
-                    self.buf.finish_path(value, self.target_embedding)
+                    rew = self.construct_s3d_reward(ep_frames)
+                    self.buf.finish_path(value, rew)
 
                     self.logger.add(EpRet=ep_ret)
 

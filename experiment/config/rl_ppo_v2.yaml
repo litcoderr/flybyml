@@ -6,7 +6,7 @@ done_buf_size: 100
 train:
   epoch: 10000
   steps_per_epoch: 4000
-  max_ep_len: 200
+  max_ep_len: 128
   gamma: 0.99
   lam: 0.95
   clip_ratio: 0.2
@@ -21,3 +21,5 @@ model:
 s3d:
   vocab: C:\Users\lee\Desktop\ml\flybyml\module\s3d\s3d_dict.npy
   pretrained: C:\Users\lee\Desktop\ml\flybyml\module\s3d\s3d_howto100m.pth
+  demotype: text
+  demo: cockpit leveling out the plane

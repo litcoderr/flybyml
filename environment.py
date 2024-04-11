@@ -113,9 +113,6 @@ class XplaneEnvironment:
                 time.sleep(0.1)
         return state
     
-    def get_window_size(self) -> Tuple[int, int]:
-        return self.monitor["width"], self.monitor["height"]
-
     def render(self) -> np.array:
         """
         make a screenshot of this environment
