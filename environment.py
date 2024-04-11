@@ -1,6 +1,10 @@
 from typing import Tuple, Optional
 
 import time
+import pygetwindow as pw
+import pyautogui
+from mss import mss
+import numpy as np
 
 from aircraft.b738 import B738
 from util import sample_weather, kts_to_mps
@@ -16,6 +20,8 @@ class XplaneEnvironment:
         self.agent = agent
 
         self.api = API()  # xpilot controller
+        window = pw.getWindowsWithTitle("X-System")[0]
+        self.monitor = {"top": window.top, "left": window.left, "width": window.width, "height": window.height}
     
     def reset(self, lat, lon, alt, heading, spd, zulu_time, 
               weather: Optional[Weather]=None, controls: Optional[Controls]=None, pause=False) -> Tuple[PlaneState, Controls]:
@@ -106,3 +112,15 @@ class XplaneEnvironment:
             except:
                 time.sleep(0.1)
         return state
+    
+    def get_window_size(self) -> Tuple[int, int]:
+        return self.monitor["width"], self.monitor["height"]
+
+    def render(self) -> np.array:
+        """
+        make a screenshot of this environment
+        """
+        with mss() as sct:
+            frame = np.array(sct.grab(self.monitor), dtype=np.uint8)
+
+        return frame
