@@ -1,0 +1,20 @@
+project: rl
+run: ppo_sparse
+device: cuda
+step_interval: 0.1  # time interval between steps (sec)
+done_buf_size: 100
+train:
+  epoch: 10000
+  steps_per_epoch: 4000
+  max_ep_len: 200
+  gamma: 0.99
+  lam: 0.95
+  clip_ratio: 0.2
+  pi_iters: 80
+  v_iters: 80
+  pi_lr: 0.0003
+  v_lr: 0.001
+  target_kl: 0.01
+model:
+  obs_dim: 4 # [e_pitch, e_bank, d_pitch, d_bank]
+  act_dim: 2 # [elev, ail]
