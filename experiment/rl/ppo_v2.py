@@ -171,13 +171,13 @@ class PPOBuffer:
         self.logp_buf[self.ptr] = logp
         self.ptr += 1
 
-    def finish_path(self, val, rew):
+    def finish_path(self, val):
         """
         End of trajectory.
         Calculate GAE-Lambda advantage and Return for this trajectory
         """
         path_slice = slice(self.path_start_idx, self.ptr)
-        rews = np.append(self.rew_buf[path_slice], rew)
+        rews = np.append(self.rew_buf[path_slice], val)
         vals = np.append(self.val_buf[path_slice], val)
 
         # calculate GAE-Lambda advantage
@@ -407,22 +407,27 @@ class PPOModuleV2:
 
                 ep_len += 1
 
-                # save to buffer for training
-                self.buf.store(obs.cpu().numpy(), action, 0.0, value, log_prob)
+                episode_ended = ep_len == self.args.train.max_ep_len
+                epoch_ended = local_step == self.args.train.steps_per_epoch -1
+
+                if episode_ended:
+                    rew = self.construct_s3d_reward(ep_frames)
+                    # save to buffer for training
+                    self.buf.store(obs.cpu().numpy(), action, rew, value, log_prob)
+                else:
+                    # save to buffer for training
+                    self.buf.store(obs.cpu().numpy(), action, 0.0, value, log_prob)
+
                 self.logger.add(Vals=value)
 
                 # update state and prev_state
                 prev_state = state
                 state = next_state
 
-                episode_ended = ep_len == self.args.train.max_ep_len
-                epoch_ended = local_step == self.args.train.steps_per_epoch -1
                 if episode_ended or epoch_ended:
                     obs = self.construct_observation(state, prev_state, self.obj, self.args.device)
                     _, value, _ = self.model.step(obs)
-                    rew = self.construct_s3d_reward(ep_frames)
-                    self.buf.finish_path(value, rew)
-
+                    self.buf.finish_path(value)
                     self.logger.add(EpRet=ep_ret)
 
                     ep_ret = 0

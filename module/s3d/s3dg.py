@@ -14,6 +14,9 @@ S3D-G was proposed by:
 
 The S3D architecture was slightly modified with a space to depth trick for TPU
 optimization.
+
+wget https://www.rocq.inria.fr/cluster-willow/amiech/howto100m/s3d_howto100m.pth
+wget https://www.rocq.inria.fr/cluster-willow/amiech/howto100m/s3d_dict.npy
 """
 
 import torch as th
