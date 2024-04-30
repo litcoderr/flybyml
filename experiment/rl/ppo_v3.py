@@ -11,6 +11,7 @@ from omegaconf import OmegaConf
 import torch
 import wandb
 import scipy
+import math
 import random
 import torch.nn as nn
 import numpy as np
@@ -34,7 +35,7 @@ from experiment.rl.ppo_v1 import construct_reward, act_to_control, discount_cums
 
 FIXED_THR_VAL = 0.8
 
-def preprocess_video(ep_frames: list[np.array], shorten: bool=True) -> Tensor:
+def preprocess_video(ep_frames: list[np.array]) -> Tensor:
     frames = []
     toTensor = ToTensor()
     for frame in ep_frames:
@@ -42,8 +43,9 @@ def preprocess_video(ep_frames: list[np.array], shorten: bool=True) -> Tensor:
         frame = toTensor(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
         frames.append(frame)
 
-    if shorten:
-        frames = frames[::4]
+    interval = math.ceil(len(frames) / 32) 
+    frames = frames[::interval]
+
     return torch.stack(frames).transpose(1, 0).unsqueeze(0)
 
 
@@ -116,10 +118,10 @@ class PPOBuffer:
         }
 
 
-class PPOModuleV2:
+class PPOModuleV3:
     """
-    PPO with RoboCLIP:
-        reward generation by utilizing expert demonstrations (IL)
+    Dense version of PPO V2 (PPO with RoboCLIP):
+        "dense" reward generation by utilizing expert demonstrations (IL)
     """
     def __init__(self, args, train=True, ckpt_path=None):
         self.args = args
@@ -264,7 +266,8 @@ class PPOModuleV2:
 
     def train(self):
         state, prev_state = self.reset_env()
-        ep_ret = 0  # episode return for comparison (cumulative value)
+        ep_ret = 0      # episode return for comparison (cumulative value)
+        ep_ret_s3d = 0  # episode return in use (cumulative value)
         ep_len = 0  # current episode's step
         ep_frames = []
         for epoch in tqdm(range(self.args.train.epoch), desc='epoch'):
@@ -283,30 +286,28 @@ class PPOModuleV2:
                 ep_len += 1
                 ep_frames.append(self.env.render())
 
-                episode_ended = ep_len == self.args.train.max_ep_len
-                epoch_ended = local_step == self.args.train.steps_per_epoch -1
+                rew_s3d = self.construct_s3d_reward(ep_frames)
+                ep_ret_s3d += rew_s3d
 
-                if episode_ended:
-                    rew = self.construct_s3d_reward(ep_frames)
-                    # save to buffer for training
-                    self.buf.store(obs.cpu().numpy(), action, rew, value, log_prob)
-                else:
-                    # save to buffer for training
-                    self.buf.store(obs.cpu().numpy(), action, 0.0, value, log_prob)
-
+                self.buf.store(obs.cpu().numpy(), action, rew_s3d, value, log_prob)
                 self.logger.add(Vals=value)
 
                 # update state and prev_state
                 prev_state = state
                 state = next_state
 
+                episode_ended = ep_len == self.args.train.max_ep_len
+                epoch_ended = local_step == self.args.train.steps_per_epoch -1
                 if episode_ended or epoch_ended:
                     obs = self.construct_observation(state, prev_state, self.obj, self.args.device)
                     _, value, _ = self.model.step(obs)
                     self.buf.finish_path(value)
+
                     self.logger.add(EpRet=ep_ret)
+                    self.logger.add(EpRetS3D=ep_ret_s3d)
 
                     ep_ret = 0
+                    ep_ret_s3d = 0
                     ep_len = 0
                     ep_frames = []
                     state, prev_state = self.reset_env()
@@ -328,6 +329,7 @@ class PPOModuleV2:
             # log
             self.logger.log('Vals', with_min_max=True)
             self.logger.log('EpRet', with_min_max=True)
+            self.logger.log('EpRetS3D', with_min_max=True)
             self.logger.log('StopIter', average_only=True)
             self.logger.log('LossPi', average_only=True)
             self.logger.log('LossV', average_only=True)
@@ -343,5 +345,5 @@ if __name__ == "__main__":
     conf.merge_with_cli()
 
     ckpt_path = "C:/Users/lee/Desktop/ml/flybyml/experiment/rl/logs/EpRet=191.80759536772968.ckpt"
-    model = PPOModuleV2(conf, train=False, ckpt_path=ckpt_path)
+    model = PPOModuleV3(conf, train=False, ckpt_path=ckpt_path)
     model.test()

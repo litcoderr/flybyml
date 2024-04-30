@@ -17,6 +17,7 @@ from experiment.simple_fc.batch_normalize import FCBaselineBatchNormalize
 from experiment.rl.ddpg_v1 import DDPGModuleV1
 from experiment.rl.ppo_v1 import PPOModuleV1
 from experiment.rl.ppo_v2 import PPOModuleV2
+from experiment.rl.ppo_v3 import PPOModuleV3
 
 
 cur_dir = Path(os.path.dirname(__file__)) 
@@ -48,7 +49,8 @@ PL_MODULE = {
 RL_MODULE = {
     'ddpg_v1': DDPGModuleV1,
     'ppo_v1': PPOModuleV1,
-    'ppo_v2': PPOModuleV2
+    'ppo_v2': PPOModuleV2,
+    'ppo_v3': PPOModuleV3
 }
 
 def main(args):
