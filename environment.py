@@ -21,6 +21,7 @@ class XplaneEnvironment:
 
         self.api = API()  # xpilot controller
         window = pw.getWindowsWithTitle("X-System")[0]
+        window.size = (1302, 1024)
         self.monitor = {"top": window.top, "left": window.left, "width": window.width, "height": window.height}
     
     def reset(self, lat, lon, alt, heading, spd, zulu_time, 

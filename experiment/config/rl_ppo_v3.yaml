@@ -1,5 +1,5 @@
 project: rl
-run: ppo_v2
+run: ppo_v3
 device: cuda
 step_interval: 0.1  # time interval between steps (sec)
 done_buf_size: 100
