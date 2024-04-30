@@ -43,8 +43,8 @@ def preprocess_video(ep_frames: list[np.array]) -> Tensor:
         frame = toTensor(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
         frames.append(frame)
 
-    interval = math.ceil(len(frames) / 32) 
-    frames = frames[::interval]
+    # window length = 32
+    frames = frames[-32:]
 
     return torch.stack(frames).transpose(1, 0).unsqueeze(0)
 
@@ -285,8 +285,7 @@ class PPOModuleV3:
                 ep_ret += rew
                 ep_len += 1
                 ep_frames.append(self.env.render())
-
-                rew_s3d = self.construct_s3d_reward(ep_frames)
+                rew_s3d = self.construct_s3d_reward(ep_frames) if len(ep_frames) >= 32 else 0.0
                 ep_ret_s3d += rew_s3d
 
                 self.buf.store(obs.cpu().numpy(), action, rew_s3d, value, log_prob)
