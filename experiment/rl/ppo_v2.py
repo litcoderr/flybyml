@@ -28,6 +28,8 @@ from environment import XplaneEnvironment
 from state.state import PlaneState
 from module.s3d.s3dg import S3D
 from util import ft_to_me, kts_to_mps
+from experiment.rl.ppo_v1 import log_prob_from_dist, act_to_control, discount_cumsum, \
+                                    Actor, Critic, ActorCritic, Logger
 
 
 FIXED_THR_VAL = 0.8
@@ -45,104 +47,6 @@ def preprocess_video(ep_frames: list[np.array], shorten: bool=True) -> Tensor:
     return torch.stack(frames).transpose(1, 0).unsqueeze(0)
 
 
-def construct_reward(obs: Tensor) -> float:
-    intensity = 0.3  # higher the intensity, lower the value
-    rew = (-1/intensity) * torch.abs(obs[:2]) + 1
-    rew = torch.sum(rew) / 2
-    return rew.item()
-
-
-def log_prob_from_dist(dist: Normal, act: Tensor) -> Tensor:
-    return dist.log_prob(act).sum(axis=-1)
-
-
-def act_to_control(act: np.array) -> Controls:
-    """
-    act: [elev, aileron]
-    """
-    return Controls(
-        elev=act[0],
-        ail=act[1],
-        thr=FIXED_THR_VAL
-    )
-
-
-def discount_cumsum(x, discount):
-    return scipy.signal.lfilter([1], [1, float(-discount)], x[::-1], axis=0)[::-1]
-
-
-class Actor(nn.Module):
-    def __init__(self, args):
-        super().__init__()
-        self.args = args
-        self.mu = nn.Sequential(
-            nn.Linear(args.model.obs_dim, 32), nn.ReLU(), \
-            nn.Linear(32, 64), nn.ReLU(), \
-            nn.Linear(64, 128), nn.ReLU(), \
-            nn.Linear(128, 64), nn.ReLU(), \
-            nn.Linear(64, 32), nn.ReLU(), \
-            nn.Linear(32, args.model.act_dim), nn.Tanh()
-        )
-        self.log_std = torch.nn.Parameter(torch.as_tensor(
-            -0.5 * np.ones(args.model.act_dim, dtype=np.float32)
-        ))
-    
-    def get_distribution(self, obs):
-        mu = self.mu(obs)
-        std = torch.exp(self.log_std)
-        return Normal(mu, std)
-    
-    def forward(self, obs: Tensor, act: Optional[Tensor] = None):
-        """
-        Return:
-            dist: action distribution given observation 
-            log_prob: log probability of action regarding distribution
-        """
-        dist = self.get_distribution(obs)
-        log_prob = None
-        if act is not None:
-            log_prob = log_prob_from_dist(dist, act)
-        return dist, log_prob
-
-
-class Critic(nn.Module):
-    def __init__(self, args):
-        super().__init__()
-        self.args = args
-
-        self.critic = nn.Sequential(
-            nn.Linear(args.model.obs_dim, 32), nn.ReLU(), \
-            nn.Linear(32, 64), nn.ReLU(), \
-            nn.Linear(64, 128), nn.ReLU(), \
-            nn.Linear(128, 64), nn.ReLU(), \
-            nn.Linear(64, 32), nn.ReLU(), \
-            nn.Linear(32, 1)
-        )
-
-    def forward(self, obs):
-        return torch.squeeze(self.critic(obs), -1)
-
-
-class ActorCritic(nn.Module):
-    def __init__(self, args):
-        super().__init__()
-        self.args = args
-
-        self.pi = Actor(args)
-        self.v = Critic(args)
-    
-    def step(self, obs: Tensor):
-        with torch.no_grad():
-            dist = self.pi.get_distribution(obs)
-            act = dist.sample()
-            log_prob = log_prob_from_dist(dist, act)
-            value = self.v(obs)
-        return act.cpu().numpy(), value.cpu().numpy(), log_prob.cpu().numpy()
-
-    def infer(self, obs: Tensor):
-        with torch.no_grad():
-            dist = self.pi.get_distribution(obs)
-        return dist.loc
 
 class PPOBuffer:
     def __init__(self, args):
@@ -210,37 +114,6 @@ class PPOBuffer:
         return {
             k: torch.as_tensor(v, dtype=torch.float32).to(self.device) for k, v in data.items()
         }
-
-
-class Logger:
-    def __init__(self):
-        self.epoch_dict = dict()
-        self.log_dict = dict()
-    
-    def add(self, **kwargs):
-        for k, v in kwargs.items():
-            if not (k in self.epoch_dict.keys()):
-                self.epoch_dict[k] = []
-            self.epoch_dict[k].append(v)
-    
-    def flush(self):
-        wandb.log(self.log_dict)
-        self.epoch_dict = dict()
-        self.log_dict = dict()
-    
-    def log(self, key, with_min_max = False, average_only = False):
-        mean = np.mean(self.epoch_dict[key])
-
-        if average_only:
-            self.log_dict[key] = mean
-        else:
-            std = np.std(self.epoch_dict[key])
-            self.log_dict['Mean_'+key] = mean
-            self.log_dict['Std_'+key] = std
-        
-        if with_min_max:
-            self.log_dict['Min_'+key] = np.min(self.epoch_dict[key])
-            self.log_dict['Max_'+key] = np.max(self.epoch_dict[key])
 
 
 class PPOModuleV2:
@@ -432,6 +305,7 @@ class PPOModuleV2:
 
                     ep_ret = 0
                     ep_len = 0
+                    ep_frames = []
                     state, prev_state = self.reset_env()
 
             # finished an epoch
