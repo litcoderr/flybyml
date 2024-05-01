@@ -163,6 +163,8 @@ cython_debug/
 logs/
 checkpoint/
 wandb/
+*.npy
+*.pth
 
 # MacOS
 .DS_Store

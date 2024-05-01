@@ -14,120 +14,39 @@ import scipy
 import random
 import torch.nn as nn
 import numpy as np
+import cv2
 
 from pathlib import Path
 from tqdm import tqdm
 from torch import Tensor
 from torch.optim import Adam
 from torch.distributions.normal import Normal
+from torchvision.transforms import ToTensor
 
 from controls import Controls
 from environment import XplaneEnvironment
 from state.state import PlaneState
+from module.s3d.s3dg import S3D
 from util import ft_to_me, kts_to_mps
+from experiment.rl.ppo_v1 import construct_reward, act_to_control, discount_cumsum, \
+                                    ActorCritic, Logger
 
 
 FIXED_THR_VAL = 0.8
 
+def preprocess_video(ep_frames: list[np.array], shorten: bool=True) -> Tensor:
+    frames = []
+    toTensor = ToTensor()
+    for frame in ep_frames:
+        frame = cv2.resize(frame, (256, 256), interpolation=cv2.INTER_AREA)
+        frame = toTensor(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
+        frames.append(frame)
 
-def construct_reward(obs: Tensor) -> float:
-    intensity = 0.3  # higher the intensity, lower the value
-    rew = (-1/intensity) * torch.abs(obs[:2]) + 1
-    rew = torch.sum(rew) / 2
-    return rew.item()
-
-
-def log_prob_from_dist(dist: Normal, act: Tensor) -> Tensor:
-    return dist.log_prob(act).sum(axis=-1)
-
-
-def act_to_control(act: np.array) -> Controls:
-    """
-    act: [elev, aileron]
-    """
-    return Controls(
-        elev=act[0],
-        ail=act[1],
-        thr=FIXED_THR_VAL
-    )
+    if shorten:
+        frames = frames[::4]
+    return torch.stack(frames).transpose(1, 0).unsqueeze(0)
 
 
-def discount_cumsum(x, discount):
-    return scipy.signal.lfilter([1], [1, float(-discount)], x[::-1], axis=0)[::-1]
-
-
-class Actor(nn.Module):
-    def __init__(self, args):
-        super().__init__()
-        self.args = args
-        self.mu = nn.Sequential(
-            nn.Linear(args.model.obs_dim, 32), nn.ReLU(), \
-            nn.Linear(32, 64), nn.ReLU(), \
-            nn.Linear(64, 128), nn.ReLU(), \
-            nn.Linear(128, 64), nn.ReLU(), \
-            nn.Linear(64, 32), nn.ReLU(), \
-            nn.Linear(32, args.model.act_dim), nn.Tanh()
-        )
-        self.log_std = torch.nn.Parameter(torch.as_tensor(
-            -0.5 * np.ones(args.model.act_dim, dtype=np.float32)
-        ))
-    
-    def get_distribution(self, obs):
-        mu = self.mu(obs)
-        std = torch.exp(self.log_std)
-        return Normal(mu, std)
-    
-    def forward(self, obs: Tensor, act: Optional[Tensor] = None):
-        """
-        Return:
-            dist: action distribution given observation 
-            log_prob: log probability of action regarding distribution
-        """
-        dist = self.get_distribution(obs)
-        log_prob = None
-        if act is not None:
-            log_prob = log_prob_from_dist(dist, act)
-        return dist, log_prob
-
-
-class Critic(nn.Module):
-    def __init__(self, args):
-        super().__init__()
-        self.args = args
-
-        self.critic = nn.Sequential(
-            nn.Linear(args.model.obs_dim, 32), nn.ReLU(), \
-            nn.Linear(32, 64), nn.ReLU(), \
-            nn.Linear(64, 128), nn.ReLU(), \
-            nn.Linear(128, 64), nn.ReLU(), \
-            nn.Linear(64, 32), nn.ReLU(), \
-            nn.Linear(32, 1)
-        )
-
-    def forward(self, obs):
-        return torch.squeeze(self.critic(obs), -1)
-
-
-class ActorCritic(nn.Module):
-    def __init__(self, args):
-        super().__init__()
-        self.args = args
-
-        self.pi = Actor(args)
-        self.v = Critic(args)
-    
-    def step(self, obs: Tensor):
-        with torch.no_grad():
-            dist = self.pi.get_distribution(obs)
-            act = dist.sample()
-            log_prob = log_prob_from_dist(dist, act)
-            value = self.v(obs)
-        return act.cpu().numpy(), value.cpu().numpy(), log_prob.cpu().numpy()
-
-    def infer(self, obs: Tensor):
-        with torch.no_grad():
-            dist = self.pi.get_distribution(obs)
-        return dist.loc
 
 class PPOBuffer:
     def __init__(self, args):
@@ -197,38 +116,11 @@ class PPOBuffer:
         }
 
 
-class Logger:
-    def __init__(self):
-        self.epoch_dict = dict()
-        self.log_dict = dict()
-    
-    def add(self, **kwargs):
-        for k, v in kwargs.items():
-            if not (k in self.epoch_dict.keys()):
-                self.epoch_dict[k] = []
-            self.epoch_dict[k].append(v)
-    
-    def flush(self):
-        wandb.log(self.log_dict)
-        self.epoch_dict = dict()
-        self.log_dict = dict()
-    
-    def log(self, key, with_min_max = False, average_only = False):
-        mean = np.mean(self.epoch_dict[key])
-
-        if average_only:
-            self.log_dict[key] = mean
-        else:
-            std = np.std(self.epoch_dict[key])
-            self.log_dict['Mean_'+key] = mean
-            self.log_dict['Std_'+key] = std
-        
-        if with_min_max:
-            self.log_dict['Min_'+key] = np.min(self.epoch_dict[key])
-            self.log_dict['Max_'+key] = np.max(self.epoch_dict[key])
-
-
-class PPOModuleV1:
+class PPOModuleV2:
+    """
+    PPO with RoboCLIP:
+        reward generation by utilizing expert demonstrations (IL)
+    """
     def __init__(self, args, train=True, ckpt_path=None):
         self.args = args
         self.env = XplaneEnvironment(agent=None)
@@ -244,6 +136,15 @@ class PPOModuleV1:
 
         self.pi_optim = Adam(self.model.pi.parameters(), lr=args.train.pi_lr)
         self.v_optim = Adam(self.model.v.parameters(), lr=args.train.v_lr)
+
+        # load pretrained s3d module
+        self.s3d = S3D(args.s3d.vocab, 512)
+        self.s3d.load_state_dict(torch.load(args.s3d.pretrained))
+        self.s3d = self.s3d.eval()
+
+        if args.s3d.demotype == "text":
+            text_output = self.s3d.text_module([args.s3d.demo])["text_embedding"]
+            self.target_emb = text_output[0]
 
         if train:
             # init wandb logger
@@ -307,6 +208,15 @@ class PPOModuleV1:
         obs, ret = data['obs'], data['ret']
         return ((self.model.v(obs) - ret)**2).mean()
 
+    def construct_s3d_reward(self, ep_frames: list[np.array]) -> float:
+        """
+        compute similarity between demo (text/video) and current episode video
+        """
+        video = preprocess_video(ep_frames)
+        video_emb = self.s3d(video)["video_embedding"]
+
+        return torch.matmul(self.target_emb, video_emb.t()).item()
+
     def update(self):
         data = self.buf.get()
 
@@ -354,8 +264,9 @@ class PPOModuleV1:
 
     def train(self):
         state, prev_state = self.reset_env()
-        ep_ret = 0  # episode return (cumulative value)
+        ep_ret = 0  # episode return for comparison (cumulative value)
         ep_len = 0  # current episode's step
+        ep_frames = []
         for epoch in tqdm(range(self.args.train.epoch), desc='epoch'):
             for local_step in tqdm(range(self.args.train.steps_per_epoch), desc='local step'):
                 obs = self.construct_observation(state, prev_state, self.obj, self.args.device)
@@ -366,31 +277,38 @@ class PPOModuleV1:
                 # take env step using sampled action
                 next_state = self.env.rl_step(act_to_control(action), self.args.step_interval)
                 next_obs = self.construct_observation(next_state, state, self.obj, 'cpu')
-
-                # calculate reward by taking this action
+                                
                 rew = construct_reward(next_obs)
                 ep_ret += rew
                 ep_len += 1
+                ep_frames.append(self.env.render())
 
-                # save to buffer for training
-                self.buf.store(obs.cpu().numpy(), action, rew, value, log_prob)
+                episode_ended = ep_len == self.args.train.max_ep_len
+                epoch_ended = local_step == self.args.train.steps_per_epoch -1
+
+                if episode_ended:
+                    rew = self.construct_s3d_reward(ep_frames)
+                    # save to buffer for training
+                    self.buf.store(obs.cpu().numpy(), action, rew, value, log_prob)
+                else:
+                    # save to buffer for training
+                    self.buf.store(obs.cpu().numpy(), action, 0.0, value, log_prob)
+
                 self.logger.add(Vals=value)
 
                 # update state and prev_state
                 prev_state = state
                 state = next_state
 
-                episode_ended = ep_len == self.args.train.max_ep_len
-                epoch_ended = local_step == self.args.train.steps_per_epoch -1
                 if episode_ended or epoch_ended:
                     obs = self.construct_observation(state, prev_state, self.obj, self.args.device)
                     _, value, _ = self.model.step(obs)
                     self.buf.finish_path(value)
-
                     self.logger.add(EpRet=ep_ret)
 
                     ep_ret = 0
                     ep_len = 0
+                    ep_frames = []
                     state, prev_state = self.reset_env()
 
             # finished an epoch
@@ -425,5 +343,5 @@ if __name__ == "__main__":
     conf.merge_with_cli()
 
     ckpt_path = "C:/Users/lee/Desktop/ml/flybyml/experiment/rl/logs/EpRet=191.80759536772968.ckpt"
-    model = PPOModuleV1(conf, ckpt_path=ckpt_path)
+    model = PPOModuleV2(conf, train=False, ckpt_path=ckpt_path)
     model.test()

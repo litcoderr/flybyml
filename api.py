@@ -2,7 +2,7 @@ import binascii
 import platform
 import socket
 import struct
-import xpc
+from XPlaneConnect.Python3.src import xpc
 
 from controls import Controls, Camera
 from state.att import Attitude
@@ -186,7 +186,7 @@ class API(object):
             self.set_brake(controls.brake)
             self.set_speedbrake(controls.spd_brake)
             self.set_reverse_thrust(controls.reverse)
-            # self.set_camera(controls.camera)
+            #self.set_camera(controls.camera)
     
     def get_ctrl(self) -> Controls:
         with xpc.XPlaneConnect() as client:

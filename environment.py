@@ -1,6 +1,10 @@
 from typing import Tuple, Optional
 
 import time
+import pygetwindow as pw
+import pyautogui
+from mss import mss
+import numpy as np
 
 from aircraft.b738 import B738
 from util import sample_weather, kts_to_mps
@@ -16,8 +20,12 @@ class XplaneEnvironment:
         self.agent = agent
 
         self.api = API()  # xpilot controller
+        window = pw.getWindowsWithTitle("X-System")[0]
+        window.size = (1302, 1024)
+        self.monitor = {"top": window.top, "left": window.left, "width": window.width, "height": window.height}
     
-    def reset(self, lat, lon, alt, heading, spd, zulu_time, weather: Optional[Weather]=None, pause=False) -> Tuple[PlaneState, Controls]:
+    def reset(self, lat, lon, alt, heading, spd, zulu_time, 
+              weather: Optional[Weather]=None, controls: Optional[Controls]=None, pause=False) -> Tuple[PlaneState, Controls]:
         """
         lat: degree
         lon: degree
@@ -26,6 +34,7 @@ class XplaneEnvironment:
         spd: m/s
         zulu_time: GMT time. seconds since midnight
         weather: Weather object
+        controls: Controls object
         """
         self.api.resume()
         if weather == None:
@@ -41,10 +50,15 @@ class XplaneEnvironment:
             except Exception as e:
                 print(e)
                 time.sleep(0.1)
-        init_ctrl = self.api.init_ctrl() 
+        # init controls / state
+        if controls:
+            self.api.send_ctrl(controls)
+            init_ctrl = controls
+        else:
+            init_ctrl = self.api.init_ctrl() 
         while True:
             # wait for simulator to load
-            init_state = self.getState()
+            init_state = self.get_state()
             if init_state.spd > kts_to_mps(200):
                 break
         
@@ -56,7 +70,7 @@ class XplaneEnvironment:
     def step(self, **kwargs) -> Tuple[PlaneState, Controls, float]:
         while True:
             try:
-                current_state = self.getState()
+                current_state = self.get_state()
                 controls = self.agent.sample_action(current_state, **kwargs)
                 self.api.send_ctrl(controls)
                 break
@@ -84,11 +98,11 @@ class XplaneEnvironment:
                 self.api.pause()
                 time.sleep(0.05)
         time.sleep(step_interval)
-        next_state = self.getState()
+        next_state = self.get_state()
         self.api.pause()
         return next_state
 
-    def getState(self) -> PlaneState:
+    def get_state(self) -> PlaneState:
         while True:
             try:
                 pos, att = self.api.get_posi_att()
@@ -99,3 +113,12 @@ class XplaneEnvironment:
             except:
                 time.sleep(0.1)
         return state
+    
+    def render(self) -> np.array:
+        """
+        make a screenshot of this environment
+        """
+        with mss() as sct:
+            frame = np.array(sct.grab(self.monitor), dtype=np.uint8)
+
+        return frame
