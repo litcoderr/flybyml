@@ -9,7 +9,7 @@
             "type": "python",
             "request": "launch",
             "module": "experiment.train",
-            "args": ["rl_ddpg_v1"],
+            "args": ["rl_ppo_sparse"],
             "justMyCode": true
         },
         {

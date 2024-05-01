@@ -41,12 +41,12 @@ class XplaneEnvironment:
             except Exception as e:
                 print(e)
                 time.sleep(0.1)
+        init_ctrl = self.api.init_ctrl() 
         while True:
             # wait for simulator to load
             init_state = self.getState()
-            if init_state.spd > kts_to_mps(130):
+            if init_state.spd > kts_to_mps(200):
                 break
-        init_ctrl = self.api.init_ctrl() 
         
         if pause:
             self.api.pause()
