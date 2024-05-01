@@ -1,0 +1,21 @@
+project: ml
+run: lstm_v1
+seed: 42
+train:
+  batch_size: 64
+  num_workers: 4
+  gpus: 1
+  num_epochs: 100000
+  save_epochs: 500
+  plot_every_epochs: 500
+test:
+  batch_size: 64
+  num_workers: 4
+model:
+  dsensory: 8     # [pitch, roll, spd, vert_spd, e_pitch, e_roll, e_spd, e_vert_spd]
+  daction: 3      # [elev, ail, thrust]
+  num_layers: 2
+  hidden_size: 64
+  dropout: 0.1
+dataset:
+  root: /data/flybyml_dataset_v1
