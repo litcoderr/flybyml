@@ -16,6 +16,7 @@ from copy import deepcopy
 from torch import Tensor
 from torch.distributions.normal import Normal
 from torch.optim import Adam
+from omegaconf import OmegaConf
 
 from state.state import PlaneState
 from util import ft_to_me, kts_to_mps
@@ -189,8 +190,9 @@ class ReplayBuffer:
 
 
 class DDPGModuleV1:
-    def __init__(self, args):
+    def __init__(self, args, train=True, ckpt_path=None):
         self.args = args
+        self.is_train = train
 
         # initialize xplane environment
         # agent is not necessary, since we will be feeding in input through rl_step function
@@ -198,6 +200,8 @@ class DDPGModuleV1:
 
         # initialize model
         self.policy = ActorCriticModelV1(args)
+        if ckpt_path is not None:
+            self.policy.load_state_dict(torch.load(ckpt_path))
         self.target = deepcopy(self.policy)
         for p in self.target.parameters():
             p.requires_grad = False
@@ -212,13 +216,14 @@ class DDPGModuleV1:
         self.buf = ReplayBuffer(args)
 
         # initialize logger
-        wandb.init(project=args.project, name=args.run, entity="flybyml")
-        wandb.config = args
-        wandb.watch(self.policy)
+        if train:
+            wandb.init(project=args.project, name=args.run, entity="flybyml")
+            wandb.config = args
+            wandb.watch(self.policy)
 
-        # configure model checkpoint save root
-        self.ckpt_root = Path(os.path.dirname(__file__)) / "../" / args.project / "logs" / args.run
-        os.makedirs(self.ckpt_root, exist_ok=True)
+            # configure model checkpoint save root
+            self.ckpt_root = Path(os.path.dirname(__file__)) / "../" / args.project / "logs" / args.run
+            os.makedirs(self.ckpt_root, exist_ok=True)
     
     def construct_observation(self, step: int, cur_state: PlaneState, prev_state: PlaneState, objective) -> Tensor:
         """
@@ -343,7 +348,7 @@ class DDPGModuleV1:
         }
 
 
-    def test(self, global_step):
+    def test(self, global_step=0):
         test_return = 0
         with torch.no_grad():
             alt, heading, spd = sample_state()
@@ -372,22 +377,24 @@ class DDPGModuleV1:
 
                 prev_state = state
                 state = next_state
+
         # check if we should save the model or not
-        save = True
-        if len(os.listdir(self.ckpt_root)) > 0:
-            original_name = os.listdir(self.ckpt_root)[0]
-            original_return = float(original_name.split(".")[0].split("reward=")[1])
-            if original_return >= test_return:
-                save = False
+        if self.is_train:
+            save = True
+            if len(os.listdir(self.ckpt_root)) > 0:
+                original_name = os.listdir(self.ckpt_root)[0]
+                original_return = float(original_name.split(".")[0].split("reward=")[1])
+                if original_return >= test_return:
+                    save = False
+                if save:
+                    os.remove(self.ckpt_root / original_name)
             if save:
-                os.remove(self.ckpt_root / original_name)
-        if save:
-            torch.save(self.policy.state_dict(), self.ckpt_root / f"reward={test_return}.ckpt")
-        
-        # log
-        wandb.log({
-            'test_return': test_return
-        }, step=global_step)
+                torch.save(self.policy.state_dict(), self.ckpt_root / f"reward={test_return}.ckpt")
+            
+            # log
+            wandb.log({
+                'test_return': test_return
+            }, step=global_step)
     
     def train(self):
         done = True
@@ -445,3 +452,12 @@ class DDPGModuleV1:
 
             prev_state = state
             state = next_state
+
+
+if __name__ == "__main__":
+    conf = OmegaConf.load("C:/Users/litco/Desktop/project/flybyml/experiment/config/rl_ddpg_v1.yaml")
+    conf.merge_with_cli()
+
+    ckpt_path = "C:/Users/litco/Desktop/project/flybyml/experiment/rl/logs/ddpg_v2/reward=354.4825134277344.ckpt"
+    model = DDPGModuleV1(conf, train=False, ckpt_path=ckpt_path)
+    model.test()
