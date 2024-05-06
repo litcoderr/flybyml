@@ -4,16 +4,13 @@ using Proximal Policy Optimization
 
 목표: 수평을 맞춰라!
 """
-from typing import Tuple, Optional
+from typing import Tuple, List
 
 import os
 from omegaconf import OmegaConf
 import torch
 import wandb
-import scipy
-import math
 import random
-import torch.nn as nn
 import numpy as np
 import cv2
 
@@ -21,7 +18,7 @@ from pathlib import Path
 from tqdm import tqdm
 from torch import Tensor
 from torch.optim import Adam
-from torch.distributions.normal import Normal
+import torch.nn.functional as F
 from torchvision.transforms import ToTensor
 
 from controls import Controls
@@ -35,7 +32,7 @@ from experiment.rl.ppo_v1 import construct_reward, act_to_control, discount_cums
 
 FIXED_THR_VAL = 0.8
 
-def preprocess_video(ep_frames: list[np.array]) -> Tensor:
+def preprocess_video(ep_frames: List[np.array]) -> Tensor:
     frames = []
     toTensor = ToTensor()
     for frame in ep_frames:
@@ -43,12 +40,29 @@ def preprocess_video(ep_frames: list[np.array]) -> Tensor:
         frame = toTensor(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
         frames.append(frame)
 
-    # window length = 32
-    frames = frames[-32:]
-
     return torch.stack(frames).transpose(1, 0).unsqueeze(0)
 
+def video_to_tensor(video_path: str) -> Tensor:
+    cap = cv2.VideoCapture(str(video_path))
+    if not cap.isOpened():
+        print("not opened")
 
+    frames = []
+    toTensor = ToTensor()
+    while True:
+        ret, frame = cap.read()
+        if not ret:
+            break
+        frame = cv2.resize(frame, (256, 256), interpolation=cv2.INTER_AREA)
+        frame = toTensor(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
+        frame = torch.tensor(frame, dtype=torch.float32) / 255.0
+        frames.append(frame)
+    if len(frames) % 2 == 1:
+        frames = frames[:-1]
+        
+    cap.release()
+
+    return torch.stack(frames).permute(1, 0, 2, 3).unsqueeze(0)
 
 class PPOBuffer:
     def __init__(self, args):
@@ -68,21 +82,22 @@ class PPOBuffer:
         self.path_start_idx = 0
         self.max_size = args.train.steps_per_epoch
     
-    def store(self, obs, act, rew, val, logp):
+    def store(self, obs, act, val, logp):
         assert self.ptr < self.max_size
         self.obs_buf[self.ptr] = obs
         self.act_buf[self.ptr] = act
-        self.rew_buf[self.ptr] = rew
+        # self.rew_buf[self.ptr] = rew
         self.val_buf[self.ptr] = val
         self.logp_buf[self.ptr] = logp
         self.ptr += 1
 
-    def finish_path(self, val):
+    def finish_path(self, rew, val):
         """
         End of trajectory.
         Calculate GAE-Lambda advantage and Return for this trajectory
         """
         path_slice = slice(self.path_start_idx, self.ptr)
+        self.rew_buf[self.path_start_idx, self.path_start_idx+len(rew)] = rew
         rews = np.append(self.rew_buf[path_slice], val)
         vals = np.append(self.val_buf[path_slice], val)
 
@@ -143,10 +158,12 @@ class PPOModuleV3:
         self.s3d = S3D(args.s3d.vocab, 512)
         self.s3d.load_state_dict(torch.load(args.s3d.pretrained))
         self.s3d = self.s3d.eval()
+        self.s3d = self.s3d.to('cuda')
 
-        if args.s3d.demotype == "text":
-            text_output = self.s3d.text_module([args.s3d.demo])["text_embedding"]
-            self.target_emb = text_output[0]
+        if args.s3d.demotype == "video":
+            demo = video_to_tensor(args.s3d.demo).to('cuda')
+            with torch.no_grad():
+                self.demo_emb = self.s3d(demo)["video_embedding"].to('cpu')
 
         if train:
             # init wandb logger
@@ -210,14 +227,19 @@ class PPOModuleV3:
         obs, ret = data['obs'], data['ret']
         return ((self.model.v(obs) - ret)**2).mean()
 
-    def construct_s3d_reward(self, ep_frames: list[np.array]) -> float:
+    def construct_s3d_reward(self, ep_frames: List[np.array], window_size: int = 32) -> float:
         """
         compute similarity between demo (text/video) and current episode video
         """
+        rew = []
         video = preprocess_video(ep_frames)
-        video_emb = self.s3d(video)["video_embedding"]
+        with torch.no_grad():
+            for start_idx in range(len(ep_frames)-window_size+1):
+                window = video[:, :, start_idx:start_idx+window_size, :, :].to('cuda')
+                window_emb = self.s3d(window)["video_embedding"].to('cpu')
+                rew.append(F.cosine_similarity(self.demo_emb, window_emb, dim=-1).item())
 
-        return torch.matmul(self.target_emb, video_emb.t()).item()
+        return np.array(rew)
 
     def update(self):
         data = self.buf.get()
@@ -267,7 +289,6 @@ class PPOModuleV3:
     def train(self):
         state, prev_state = self.reset_env()
         ep_ret = 0      # episode return for comparison (cumulative value)
-        ep_ret_s3d = 0  # episode return in use (cumulative value)
         ep_len = 0  # current episode's step
         ep_frames = []
         for epoch in tqdm(range(self.args.train.epoch), desc='epoch'):
@@ -285,10 +306,8 @@ class PPOModuleV3:
                 ep_ret += rew
                 ep_len += 1
                 ep_frames.append(self.env.render())
-                rew_s3d = self.construct_s3d_reward(ep_frames) if len(ep_frames) >= 32 else 0.0
-                ep_ret_s3d += rew_s3d
 
-                self.buf.store(obs.cpu().numpy(), action, rew_s3d, value, log_prob)
+                self.buf.store(obs.cpu().numpy(), action, value, log_prob)
                 self.logger.add(Vals=value)
 
                 # update state and prev_state
@@ -298,15 +317,16 @@ class PPOModuleV3:
                 episode_ended = ep_len == self.args.train.max_ep_len
                 epoch_ended = local_step == self.args.train.steps_per_epoch -1
                 if episode_ended or epoch_ended:
+                    # compute windowed s3d reward once
+                    s3d_rew = self.construct_s3d_reward(ep_frames)
                     obs = self.construct_observation(state, prev_state, self.obj, self.args.device)
                     _, value, _ = self.model.step(obs)
-                    self.buf.finish_path(value)
+                    self.buf.finish_path(s3d_rew, value)
 
                     self.logger.add(EpRet=ep_ret)
-                    self.logger.add(EpRetS3D=ep_ret_s3d)
+                    self.logger.add(EpRetS3D=np.sum(s3d_rew))
 
                     ep_ret = 0
-                    ep_ret_s3d = 0
                     ep_len = 0
                     ep_frames = []
                     state, prev_state = self.reset_env()

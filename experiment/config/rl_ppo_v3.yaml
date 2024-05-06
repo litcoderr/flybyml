@@ -21,5 +21,5 @@ model:
 s3d:
   vocab: C:/Users/litco/Desktop/project/flybyml/module/s3d/s3d_dict.npy
   pretrained: C:/Users/litco/Desktop/project/flybyml/module/s3d/s3d_howto100m.pth
-  demotype: text
-  demo: cockpit leveling out the plane
+  demotype: video
+  demo: C:/Users/litco/Desktop/project/flybyml/module/s3d/alignment_sample/level_flight.mp4
