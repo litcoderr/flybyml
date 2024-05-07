@@ -54,7 +54,7 @@ def video_to_tensor(video_path: str) -> Tensor:
         frames = frames[:-1]
 
     frames = torch.stack(frames)
-    return frames.permute(1, 0, 2, 3).unsqueeze(0)
+    return frames.permute(3, 0, 1, 2).unsqueeze(0)
 
 class PPOBuffer:
     def __init__(self, args):
