@@ -22,4 +22,4 @@ s3d:
   vocab: C:/Users/litco/Desktop/project/flybyml/module/s3d/s3d_dict.npy
   pretrained: C:/Users/litco/Desktop/project/flybyml/module/s3d/s3d_howto100m.pth
   demotype: video
-  demo: C:/Users/litco/Desktop/project/flybyml/module/s3d/alignment_sample/level_flight.mp4
+  demo: C:/Users/litco/Desktop/soomin/smlee-flyml/module/s3d/alignment_sample/level_flight.mp4

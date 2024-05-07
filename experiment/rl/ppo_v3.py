@@ -13,6 +13,7 @@ import wandb
 import random
 import numpy as np
 import cv2
+import imageio.v3 as iio
 
 from pathlib import Path
 from tqdm import tqdm
@@ -43,26 +44,17 @@ def preprocess_video(ep_frames: List[np.array]) -> Tensor:
     return torch.stack(frames).transpose(1, 0).unsqueeze(0)
 
 def video_to_tensor(video_path: str) -> Tensor:
-    cap = cv2.VideoCapture(str(video_path))
-    if not cap.isOpened():
-        print("not opened")
-
+    cap = iio.imread(video_path)
     frames = []
-    toTensor = ToTensor()
-    while True:
-        ret, frame = cap.read()
-        if not ret:
-            break
+    for frame in cap:
         frame = cv2.resize(frame, (256, 256), interpolation=cv2.INTER_AREA)
-        frame = toTensor(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
         frame = torch.tensor(frame, dtype=torch.float32) / 255.0
         frames.append(frame)
     if len(frames) % 2 == 1:
         frames = frames[:-1]
-        
-    cap.release()
 
-    return torch.stack(frames).permute(1, 0, 2, 3).unsqueeze(0)
+    frames = torch.stack(frames)
+    return frames.permute(1, 0, 2, 3).unsqueeze(0)
 
 class PPOBuffer:
     def __init__(self, args):
@@ -97,7 +89,7 @@ class PPOBuffer:
         Calculate GAE-Lambda advantage and Return for this trajectory
         """
         path_slice = slice(self.path_start_idx, self.ptr)
-        self.rew_buf[self.path_start_idx, self.path_start_idx+len(rew)] = rew
+        self.rew_buf[self.path_start_idx: self.path_start_idx+len(rew)] = rew
         rews = np.append(self.rew_buf[path_slice], val)
         vals = np.append(self.val_buf[path_slice], val)
 
