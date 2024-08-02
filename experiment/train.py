@@ -23,6 +23,7 @@ from experiment.rl.ddpg_v1 import DDPGModuleV1
 from experiment.rl.ppo_v1 import PPOModuleV1
 from experiment.rl.ppo_v2 import PPOModuleV2
 from experiment.rl.ppo_v3 import PPOModuleV3
+from experiment.rl.ppo_v4 import PPOModuleV4
 from experiment.rl.ppo_sparse import PPOModuleSparse
 
 
@@ -67,7 +68,8 @@ RL_MODULE = {
     'ppo_v1': PPOModuleV1,
     'ppo_sparse': PPOModuleSparse,
     'ppo_v2': PPOModuleV2,
-    'ppo_v3': PPOModuleV3
+    'ppo_v3': PPOModuleV3,
+    'ppo_v4': PPOModuleV4
 }
 
 def main(args):
