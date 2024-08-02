@@ -70,7 +70,7 @@ class PPOModuleV4:
         self.v_optim = Adam(self.model.v.parameters(), lr=args.train.v_lr)
 
         # load CLiP
-        self.model, self.preprocess = clip.load("ViT-B/32", device=self.args.device)
+        self.clip, self.preprocess = clip.load("ViT-B/32", device=self.args.device)
         # extract features of demo videos in advance
         self.demo_feats = []
         demo_names = os.listdir(str(DEMO_PATH))
@@ -90,7 +90,7 @@ class PPOModuleV4:
     def extract_feat(self, frame: Image.Image):
         with torch.no_grad():
             image = self.preprocess(frame).unsqueeze(0).to(self.args.device)
-            return self.model.encode_image(image).cpu().numpy()
+            return self.clip.encode_image(image).cpu().numpy()
         
     def construct_clip_reward(self, ep_frames: List[np.array], window_size: int = 32) -> np.array:
         """

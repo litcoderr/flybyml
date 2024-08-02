@@ -7,7 +7,7 @@ train:
   gpus: 1
   epoch: 10000
   steps_per_epoch: 4000
-  max_ep_len: 128
+  max_ep_len: 200
   gamma: 0.99
   lam: 0.95
   clip_ratio: 0.2
