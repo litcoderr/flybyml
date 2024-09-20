@@ -9,7 +9,7 @@
             "type": "python",
             "request": "launch",
             "module": "experiment.train",
-            "args": ["rl_ppo_sparse"],
+            "args": ["rl_ppo_lunarlander_heuristic"],
             "justMyCode": true
         },
         {

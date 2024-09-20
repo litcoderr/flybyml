@@ -2,56 +2,27 @@
 Reinforcement Learning of flybyml agent
 using Proximal Policy Optimization
 
-Using heuristic reward function
-
 목표: 수평을 맞춰라!
 """
 from typing import Tuple, Optional
 
+import gymnasium as gym
 import os
-from omegaconf import OmegaConf
 import torch
 import wandb
 import scipy
-import random
 import torch.nn as nn
 import numpy as np
 
+from omegaconf import OmegaConf
+from gymnasium.wrappers.time_limit import TimeLimit
 from pathlib import Path
 from tqdm import tqdm
 from torch import Tensor
 from torch.optim import Adam
-from torch.distributions.normal import Normal
-
-from controls import Controls
-from environment import XplaneEnvironment
-from state.state import PlaneState
-from util import ft_to_me, kts_to_mps
-
+from torch.distributions.categorical import Categorical
 
 FIXED_THR_VAL = 0.8
-
-
-def construct_reward(obs: Tensor) -> float:
-    intensity = 0.3  # higher the intensity, lower the value
-    rew = (-1/intensity) * torch.abs(obs[:2]) + 1
-    rew = torch.sum(rew) / 2
-    return rew.item()
-
-
-def log_prob_from_dist(dist: Normal, act: Tensor) -> Tensor:
-    return dist.log_prob(act).sum(axis=-1)
-
-
-def act_to_control(act: np.array) -> Controls:
-    """
-    act: [elev, aileron]
-    """
-    return Controls(
-        elev=act[0],
-        ail=act[1],
-        thr=FIXED_THR_VAL
-    )
 
 
 def discount_cumsum(x, discount):
@@ -70,14 +41,10 @@ class Actor(nn.Module):
             nn.Linear(64, 32), nn.ReLU(), \
             nn.Linear(32, args.model.act_dim), nn.Tanh()
         )
-        self.log_std = torch.nn.Parameter(torch.as_tensor(
-            -0.5 * np.ones(args.model.act_dim, dtype=np.float32)
-        ))
     
-    def get_distribution(self, obs):
-        mu = self.mu(obs)
-        std = torch.exp(self.log_std)
-        return Normal(mu, std)
+    def get_distribution(self, obs) -> Tuple[Categorical, torch.Tensor]:
+        logits = self.mu(obs)
+        return Categorical(logits=logits), logits
     
     def forward(self, obs: Tensor, act: Optional[Tensor] = None):
         """
@@ -85,10 +52,7 @@ class Actor(nn.Module):
             dist: action distribution given observation 
             log_prob: log probability of action regarding distribution
         """
-        dist = self.get_distribution(obs)
-        log_prob = None
-        if act is not None:
-            log_prob = log_prob_from_dist(dist, act)
+        dist, log_prob = self.get_distribution(obs)
         return dist, log_prob
 
 
@@ -120,16 +84,16 @@ class ActorCritic(nn.Module):
     
     def step(self, obs: Tensor):
         with torch.no_grad():
-            dist = self.pi.get_distribution(obs)
+            dist, log_prob = self.pi.get_distribution(obs)
             act = dist.sample()
-            log_prob = log_prob_from_dist(dist, act)
             value = self.v(obs)
-        return act.cpu().numpy(), value.cpu().numpy(), log_prob.cpu().numpy()
+        return act.cpu().item(), value.cpu().numpy(), log_prob.cpu().numpy()
 
     def infer(self, obs: Tensor):
         with torch.no_grad():
             dist = self.pi.get_distribution(obs)
         return dist.loc
+
 
 class PPOBuffer:
     def __init__(self, args):
@@ -230,63 +194,43 @@ class Logger:
             self.log_dict['Max_'+key] = np.max(self.epoch_dict[key])
 
 
-class PPOModuleV1:
+class PPOModuleHeuristicLunar:
     def __init__(self, args, train=True, ckpt_path=None):
         self.args = args
-        self.env = XplaneEnvironment(agent=None)
-        self.obj = {
-            'pitch': 0,
-            'roll': 0
-        }
+        env = gym.make('LunarLander-v2', continuous=False, enable_wind=False)
+        self.env = TimeLimit(env, max_episode_steps=self.args.train.steps_per_epoch)
+
         self.model = ActorCritic(args)
         if ckpt_path is not None:
             self.model.load_state_dict(torch.load(ckpt_path))
         self.model = self.model.to(self.args.device)
-        self.buf = PPOBuffer(args)
-
-        self.pi_optim = Adam(self.model.pi.parameters(), lr=args.train.pi_lr)
-        self.v_optim = Adam(self.model.v.parameters(), lr=args.train.v_lr)
 
         if train:
+            self.buf = PPOBuffer(args)
+            self.pi_optim = Adam(self.model.pi.parameters(), lr=args.train.pi_lr)
+            self.v_optim = Adam(self.model.v.parameters(), lr=args.train.v_lr)
+
             # init wandb logger
+            """
             wandb.init(project=args.project, name=args.run, config=dict(args), entity="flybyml")
             wandb.watch(self.model)
+            """
             self.logger = Logger()
             # configure model checkpoint save root
             self.ckpt_root = Path(os.path.dirname(__file__)) / "../" / args.project / "logs" / args.run
             os.makedirs(self.ckpt_root, exist_ok=True)
 
     
-    def reset_env(self) -> Tuple[PlaneState, PlaneState]:
+    def reset_env(self) -> Tuple[np.ndarray, dict]:
         """
-        Reset simulator and
-        pass random control inputs
-        for random starting state initialization
+        Reset simulator
+        
+        Returns:
+            observation: ndarray
         """
-        state, control = self.env.reset(lat=0, lon=0,
-                       alt=ft_to_me(20000),
-                       heading=0, spd=kts_to_mps(300),
-                       zulu_time=40000,
-                       pause=True)
+        obs, _ = self.env.reset()
+        return torch.from_numpy(obs).to(self.args.device)
 
-        rand_elev = 2 * random.random() -1
-        ail_elev = 2 * random.random() -1
-        control = Controls(elev=rand_elev, ail=ail_elev, thr=FIXED_THR_VAL)
-        for _ in range(10):
-            prev_state = state
-            state = self.env.rl_step(control, self.args.step_interval)
-        return state, prev_state
-
-    def construct_observation(self, state: PlaneState, prev_state: PlaneState, objective, device):
-        """
-        construct observation based on current state and prev states
-        """
-        # every value is normalized
-        error = torch.tensor([(state.att.pitch - objective['pitch']) / 180,
-                            (state.att.roll - objective['roll']) / 180])
-        delta = torch.tensor([(state.att.pitch - prev_state.att.pitch) * self.args.step_interval / 180,
-                            (state.att.roll - prev_state.att.roll) * self.args.step_interval / 180])
-        return torch.cat([error, delta]).to(device)
 
     def compute_loss_pi(self, data) -> Tensor:
         obs, act, adv, logp_old = data['obs'], data['act'], data['adv'], data['logp']
@@ -345,47 +289,36 @@ class PPOModuleV1:
         )
 
     def test(self):
-        state, prev_state = self.reset_env()
+        obs = self.reset_env()
         while True:
-            obs = self.construct_observation(state, prev_state, self.obj, self.args.device)
             action = self.model.infer(obs)
-
-            prev_state = state
-            state = self.env.rl_step(act_to_control(action), self.args.step_interval)
+            # TODO take step with action and update observation
 
 
     def train(self):
-        state, prev_state = self.reset_env()
+        obs = self.reset_env()
         ep_ret = 0  # episode return (cumulative value)
         ep_len = 0  # current episode's step
-        for epoch in tqdm(range(self.args.train.epoch), desc='epoch'):
-            for local_step in tqdm(range(self.args.train.steps_per_epoch), desc='local step'):
-                obs = self.construct_observation(state, prev_state, self.obj, self.args.device)
-                
+        # epoch
+        for _ in tqdm(range(self.args.train.epoch), desc='epoch'):
+            # local step
+            while True:
                 # sample action, value, log probability of action
                 action, value, log_prob = self.model.step(obs)
 
-                # take env step using sampled action
-                next_state = self.env.rl_step(act_to_control(action), self.args.step_interval)
-                next_obs = self.construct_observation(next_state, state, self.obj, 'cpu')
+                # take one timestep by applying sampled action
+                obs, rew, term, trunc, info = self.env.step(action)
+                obs = torch.from_numpy(obs).to(self.args.device)
 
-                # calculate reward by taking this action
-                rew = construct_reward(next_obs)
                 ep_ret += rew
                 ep_len += 1
 
                 # save to buffer for training
+                # TODO observe how action is used to get updated (it has changed to categorical value)
                 self.buf.store(obs.cpu().numpy(), action, rew, value, log_prob)
                 self.logger.add(Vals=value)
 
-                # update state and prev_state
-                prev_state = state
-                state = next_state
-
-                episode_ended = ep_len == self.args.train.max_ep_len
-                epoch_ended = local_step == self.args.train.steps_per_epoch -1
-                if episode_ended or epoch_ended:
-                    obs = self.construct_observation(state, prev_state, self.obj, self.args.device)
+                if term or trunc:
                     _, value, _ = self.model.step(obs)
                     self.buf.finish_path(value)
 
@@ -393,7 +326,8 @@ class PPOModuleV1:
 
                     ep_ret = 0
                     ep_len = 0
-                    state, prev_state = self.reset_env()
+                    obs = self.reset_env()
+                    break
 
             # finished an epoch
             self.update()
@@ -423,9 +357,8 @@ class PPOModuleV1:
             self.logger.flush()
 
 if __name__ == "__main__":
-    conf = OmegaConf.load("C:/Users/lee/Desktop/ml/flybyml/experiment/config/rl_ppo_v1.yaml")
+    conf = OmegaConf.load("/Users/jameschee/project/flybyml/experiment/config/rl_ppo_lunarlander_heuristic.yaml")
     conf.merge_with_cli()
 
-    ckpt_path = "C:/Users/lee/Desktop/ml/flybyml/experiment/rl/logs/EpRet=191.80759536772968.ckpt"
-    model = PPOModuleV1(conf, ckpt_path=ckpt_path)
+    model = PPOModuleHeuristicLunar(conf, train=False)
     model.test()

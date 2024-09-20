@@ -25,6 +25,7 @@ from experiment.rl.ppo_v2 import PPOModuleV2
 from experiment.rl.ppo_v3 import PPOModuleV3
 from experiment.rl.ppo_v4 import PPOModuleV4
 from experiment.rl.ppo_sparse import PPOModuleSparse
+from experiment.rl.ppo_heuristic_lunarlander import PPOModuleHeuristicLunar
 
 
 cur_dir = Path(os.path.dirname(__file__)) 
@@ -69,7 +70,8 @@ RL_MODULE = {
     'ppo_sparse': PPOModuleSparse,
     'ppo_v2': PPOModuleV2,
     'ppo_v3': PPOModuleV3,
-    'ppo_v4': PPOModuleV4
+    'ppo_v4': PPOModuleV4,
+    'ppo_lunarlander_heuristic': PPOModuleHeuristicLunar
 }
 
 def main(args):
