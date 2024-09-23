@@ -16,8 +16,8 @@
             "name": "test",
             "type": "python",
             "request": "launch",
-            "module": "experiment.test",
-            "args": ["fc_batch_normalize"],
+            "module": "experiment.rl.ppo_heuristic_lunarlander",
+            "args": [],
             "justMyCode": true
         },
     ]

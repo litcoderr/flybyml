@@ -13,6 +13,7 @@ import wandb
 import scipy
 import torch.nn as nn
 import numpy as np
+import matplotlib.pyplot as plt
 
 from omegaconf import OmegaConf
 from gymnasium.wrappers.time_limit import TimeLimit
@@ -20,10 +21,13 @@ from pathlib import Path
 from tqdm import tqdm
 from torch import Tensor
 from torch.optim import Adam
-from torch.distributions.categorical import Categorical
+from torch.distributions.normal import Normal
+from IPython.display import clear_output
 
 FIXED_THR_VAL = 0.8
 
+def log_prob_from_dist(dist: Normal, act: Tensor) -> Tensor:
+    return dist.log_prob(act).sum(axis=-1)
 
 def discount_cumsum(x, discount):
     return scipy.signal.lfilter([1], [1, float(-discount)], x[::-1], axis=0)[::-1]
@@ -41,10 +45,14 @@ class Actor(nn.Module):
             nn.Linear(64, 32), nn.ReLU(), \
             nn.Linear(32, args.model.act_dim), nn.Tanh()
         )
+        self.log_std = torch.nn.Parameter(torch.as_tensor(
+            -0.5 * np.ones(args.model.act_dim, dtype=np.float32)
+        ))
     
-    def get_distribution(self, obs) -> Tuple[Categorical, torch.Tensor]:
-        logits = self.mu(obs)
-        return Categorical(logits=logits), logits
+    def get_distribution(self, obs):
+        mu = self.mu(obs)
+        std = torch.exp(self.log_std)
+        return Normal(mu, std)
     
     def forward(self, obs: Tensor, act: Optional[Tensor] = None):
         """
@@ -52,7 +60,10 @@ class Actor(nn.Module):
             dist: action distribution given observation 
             log_prob: log probability of action regarding distribution
         """
-        dist, log_prob = self.get_distribution(obs)
+        dist = self.get_distribution(obs)
+        log_prob = None
+        if act is not None:
+            log_prob = log_prob_from_dist(dist, act)
         return dist, log_prob
 
 
@@ -84,15 +95,17 @@ class ActorCritic(nn.Module):
     
     def step(self, obs: Tensor):
         with torch.no_grad():
-            dist, log_prob = self.pi.get_distribution(obs)
+            dist = self.pi.get_distribution(obs)
             act = dist.sample()
+            act = torch.clamp(act, min=-1.0, max=1.0) # action should always be [-1, 1]
+            log_prob = log_prob_from_dist(dist, act)
             value = self.v(obs)
-        return act.cpu().item(), value.cpu().numpy(), log_prob.cpu().numpy()
+        return act.cpu().numpy(), value.cpu().numpy(), log_prob.cpu().numpy()
 
     def infer(self, obs: Tensor):
         with torch.no_grad():
             dist = self.pi.get_distribution(obs)
-        return dist.loc
+        return dist.loc.cpu().numpy()
 
 
 class PPOBuffer:
@@ -144,7 +157,6 @@ class PPOBuffer:
         """
         Get all data at the end of epoch
         """
-        assert self.ptr == self.max_size
         self.ptr, self.path_start_idx = 0, 0
 
         # advantage normalization
@@ -197,7 +209,7 @@ class Logger:
 class PPOModuleHeuristicLunar:
     def __init__(self, args, train=True, ckpt_path=None):
         self.args = args
-        env = gym.make('LunarLander-v2', continuous=False, enable_wind=False)
+        env = gym.make('LunarLander-v2', continuous=True, enable_wind=False, render_mode='rgb_array')
         self.env = TimeLimit(env, max_episode_steps=self.args.train.steps_per_epoch)
 
         self.model = ActorCritic(args)
@@ -211,17 +223,15 @@ class PPOModuleHeuristicLunar:
             self.v_optim = Adam(self.model.v.parameters(), lr=args.train.v_lr)
 
             # init wandb logger
-            """
             wandb.init(project=args.project, name=args.run, config=dict(args), entity="flybyml")
             wandb.watch(self.model)
-            """
             self.logger = Logger()
             # configure model checkpoint save root
             self.ckpt_root = Path(os.path.dirname(__file__)) / "../" / args.project / "logs" / args.run
             os.makedirs(self.ckpt_root, exist_ok=True)
 
     
-    def reset_env(self) -> Tuple[np.ndarray, dict]:
+    def reset_env(self) -> Tuple[torch.Tensor, dict]:
         """
         Reset simulator
         
@@ -290,9 +300,23 @@ class PPOModuleHeuristicLunar:
 
     def test(self):
         obs = self.reset_env()
+        plt.ion()
+        _, ax = plt.subplots()
         while True:
             action = self.model.infer(obs)
-            # TODO take step with action and update observation
+            obs, _, term, trunc, _ = self.env.step(action)
+            obs = torch.from_numpy(obs).to(self.args.device)
+
+            img = self.env.render()
+            clear_output(wait=True)
+            ax.imshow(img)
+            plt.axis('off')
+            plt.pause(0.01)
+
+            if term or trunc:
+                break
+        plt.ioff()
+        plt.show()
 
 
     def train(self):
@@ -302,19 +326,19 @@ class PPOModuleHeuristicLunar:
         # epoch
         for _ in tqdm(range(self.args.train.epoch), desc='epoch'):
             # local step
+            local_step = 1
             while True:
                 # sample action, value, log probability of action
                 action, value, log_prob = self.model.step(obs)
 
                 # take one timestep by applying sampled action
-                obs, rew, term, trunc, info = self.env.step(action)
+                obs, rew, term, trunc, _ = self.env.step(action)
                 obs = torch.from_numpy(obs).to(self.args.device)
 
                 ep_ret += rew
                 ep_len += 1
 
                 # save to buffer for training
-                # TODO observe how action is used to get updated (it has changed to categorical value)
                 self.buf.store(obs.cpu().numpy(), action, rew, value, log_prob)
                 self.logger.add(Vals=value)
 
@@ -328,6 +352,7 @@ class PPOModuleHeuristicLunar:
                     ep_len = 0
                     obs = self.reset_env()
                     break
+                local_step += 1
 
             # finished an epoch
             self.update()
