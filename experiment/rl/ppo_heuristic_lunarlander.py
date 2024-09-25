@@ -157,6 +157,7 @@ class PPOBuffer:
         """
         Get all data at the end of epoch
         """
+        assert self.ptr == self.max_size
         self.ptr, self.path_start_idx = 0, 0
 
         # advantage normalization
@@ -223,7 +224,8 @@ class PPOModuleHeuristicLunar:
             self.v_optim = Adam(self.model.v.parameters(), lr=args.train.v_lr)
 
             # init wandb logger
-            wandb.init(project=args.project, name=args.run, config=dict(args), entity="flybyml")
+            #wandb.init(project=args.project, name=args.run, config=dict(args), entity="flybyml")
+            wandb.init(project=args.project, name=args.run, config=dict(args))
             wandb.watch(self.model)
             self.logger = Logger()
             # configure model checkpoint save root
@@ -326,8 +328,7 @@ class PPOModuleHeuristicLunar:
         # epoch
         for _ in tqdm(range(self.args.train.epoch), desc='epoch'):
             # local step
-            local_step = 1
-            while True:
+            for local_step in tqdm(range(self.args.train.steps_per_epoch), desc='localstep'):
                 # sample action, value, log probability of action
                 action, value, log_prob = self.model.step(obs)
 
@@ -351,8 +352,6 @@ class PPOModuleHeuristicLunar:
                     ep_ret = 0
                     ep_len = 0
                     obs = self.reset_env()
-                    break
-                local_step += 1
 
             # finished an epoch
             self.update()

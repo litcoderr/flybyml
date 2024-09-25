@@ -1,6 +1,6 @@
 project: rl
 run: ppo_lunarlander_heuristic
-device: cuda
+device: cpu
 step_interval: 0.1  # time interval between steps (sec)
 done_buf_size: 100
 train:
