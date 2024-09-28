@@ -20,5 +20,13 @@
             "args": [],
             "justMyCode": true
         },
+        {
+            "name": "sample",
+            "type": "python",
+            "request": "launch",
+            "module": "lunar_lander.sample",
+            "args": [],
+            "justMyCode": true
+        },
     ]
 }
