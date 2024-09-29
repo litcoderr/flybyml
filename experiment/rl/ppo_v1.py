@@ -2,6 +2,8 @@
 Reinforcement Learning of flybyml agent
 using Proximal Policy Optimization
 
+Using heuristic reward function
+
 목표: 수평을 맞춰라!
 """
 from typing import Tuple, Optional

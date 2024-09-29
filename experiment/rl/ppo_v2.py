@@ -2,6 +2,8 @@
 Reinforcement Learning of flybyml agent
 using Proximal Policy Optimization
 
+Using S3D feature similarity as reward value
+
 목표: 수평을 맞춰라!
 """
 from typing import Tuple, Optional

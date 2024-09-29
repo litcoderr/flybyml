@@ -1,0 +1,20 @@
+project: rl
+run: ppo_lunarlander_heuristic
+device: cpu
+step_interval: 0.1  # time interval between steps (sec)
+done_buf_size: 100
+train:
+  steps_per_epoch: 1000
+  epoch: 1000000
+  max_ep_len: 200
+  gamma: 0.99
+  lam: 0.95
+  clip_ratio: 0.2
+  pi_iters: 80
+  v_iters: 80
+  pi_lr: 0.0003
+  v_lr: 0.001
+  target_kl: 0.01
+model:
+  obs_dim: 8 # [x, y, x_vel, y_vel, angle, angle_vel, left_on_ground, right_on_ground]
+  act_dim: 2 # continuous actions [vertical[-1, 1], horizontal[-1, 1]]

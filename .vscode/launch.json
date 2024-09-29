@@ -9,15 +9,23 @@
             "type": "python",
             "request": "launch",
             "module": "experiment.train",
-            "args": ["rl_ppo_sparse"],
+            "args": ["rl_ppo_lunarlander_heuristic"],
             "justMyCode": true
         },
         {
             "name": "test",
             "type": "python",
             "request": "launch",
-            "module": "experiment.test",
-            "args": ["fc_batch_normalize"],
+            "module": "experiment.rl.ppo_heuristic_lunarlander",
+            "args": [],
+            "justMyCode": true
+        },
+        {
+            "name": "sample",
+            "type": "python",
+            "request": "launch",
+            "module": "lunar_lander.sample",
+            "args": [],
             "justMyCode": true
         },
     ]
