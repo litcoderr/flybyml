@@ -168,3 +168,5 @@ wandb/
 
 # MacOS
 .DS_Store
+
+lunar_lander/frames/

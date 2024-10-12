@@ -1,7 +1,10 @@
+import os
 import gymnasium as gym
 import numpy as np
 import matplotlib.pyplot as plt
 
+from PIL import Image
+from pathlib import Path
 from IPython import display
 
 
@@ -29,11 +32,12 @@ def heuristic(env, state):
 
     """
 
+    angle_targ_clip = 0.5
     angle_targ = state[0] * 0.5 + state[2] * 1.0  # angle should point towards center
-    if angle_targ > 0.4:
-        angle_targ = 0.4  # more than 0.4 radians (22 degrees) is bad
-    if angle_targ < -0.4:
-        angle_targ = -0.4
+    if angle_targ > angle_targ_clip:
+        angle_targ = angle_targ_clip  # more than 0.4 radians (22 degrees) is bad
+    if angle_targ < -angle_targ_clip:
+        angle_targ = -angle_targ_clip
     hover_targ = 0.55 * np.abs(
         state[0]
     )  # target y should be proportional to horizontal offset
@@ -69,14 +73,29 @@ total_rew = 0
 steps = 0
 state, info = env.reset(seed=seed)
 
-plt.ion()
+# prepare frame saving feature# prepare frame saving feature
+save_root = Path("lunar_lander/frames")
+os.makedirs(save_root, exist_ok=True)
+ids = os.listdir(save_root)
+ids.sort()
+if len(ids) == 0:
+    vid_id = 0
+else:
+    vid_id = int(ids[-1]) + 1
+vid_id = str(vid_id).zfill(4)
+save_dir = save_root / vid_id
+os.makedirs(save_dir, exist_ok=True)
 
+frame_id = 0
+plt.ion()
 while True:
     act = heuristic(env, state)
     state, rew, term, trunc, info = env.step(act)
     total_rew += rew
 
-    plt.imshow(env.render())
+    rendered_img = env.render()
+    Image.fromarray(rendered_img).save(str(save_dir / f"{str(frame_id).zfill(4)}.jpg"))
+    plt.imshow(rendered_img)
     plt.pause(0.00001)
     display.display(plt.gcf())
     display.clear_output(wait=True)
@@ -90,6 +109,6 @@ while True:
         break
     
     plt.show()
-
+    frame_id += 1
 
 env.close()
